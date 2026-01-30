@@ -15,7 +15,7 @@ bfs_expanded = [2, 3, 6, 16, 45, 150, 513, 1966, 8043]
 
 # IDS results
 ids_created = [3, 7, 17, 41, 107, 388, 1355, 5622, 24053]
-ids_expanded = [3, 7, 17, 41, 107, 388, 1355, 5622, 24053]
+ids_expanded = [2, 4, 11, 26, 63, 239, 843, 3657, 16011]
 
 # Create figure with two subplots side by side
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))

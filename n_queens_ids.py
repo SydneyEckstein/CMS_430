@@ -54,18 +54,17 @@ def depth_limited_search(state: tuple, n: int, depth_limit: int, stats: dict) ->
     """
     current_depth = len(state)
 
-    # Expand this node
-    stats['expanded'] += 1
-
     # Check if this is a goal state
     if is_goal(state, n):
+        stats['expanded'] += 1
         return state
 
-    # If at depth limit, don't generate successors
+    # If at depth limit, don't generate successors (visited but not expanded)
     if current_depth >= depth_limit:
         return None
 
-    # Generate and explore successors
+    # Expand this node by generating successors
+    stats['expanded'] += 1
     successors = get_successors(state, n)
 
     for successor in successors:
