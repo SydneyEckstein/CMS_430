@@ -16,7 +16,28 @@ class State(object):
         self.grid = start_grid
         self.total_moves = 0
 
-    #--- Fill in the rest of the class...
+    def manhattan_distance(self):
+        return abs(self.position[0] - self.goal[0]) + abs(self.position[1] - self.goal[1])
+
+    def __lt__(self, other):
+        return self.total_moves < other.total_moves
+
+    def generate_successors(self):
+        successors = []
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+        for dr, dc in directions:
+            new_r = self.position[0] + dr
+            new_c = self.position[1] + dc
+
+            if self.grid[new_r][new_c] == 0:
+                new_grid = deepcopy(self.grid)
+                new_grid[new_r][new_c] = '*'
+                new_state = State((new_r, new_c), self.goal, new_grid)
+                new_state.total_moves = self.total_moves + 1
+                successors.append(new_state)
+
+        return successors
 
 
 def create_grid():
@@ -120,9 +141,22 @@ def main():
     # A call to queue.get() returns the tuple with the minimum first value
     queue.put((priority, start_state))
 
-    # Maybe you should use a dictionary to keep track of visited positions?
+    visited = {start_position: True}
 
-    #--- Fill in the rest of the search...
+    while not queue.empty():
+        priority, current_state = queue.get()
+
+        if current_state.position == goal_position:
+            print_grid(current_state.grid)
+            return
+
+        for successor in current_state.generate_successors():
+            if successor.position not in visited:
+                visited[successor.position] = True
+                priority = successor.total_moves + successor.manhattan_distance()
+                queue.put((priority, successor))
+
+    print("No path exists.\n")
 
 
 if __name__ == '__main__':
@@ -150,7 +184,7 @@ if __name__ == '__main__':
 
     for trial in range(5):
         print('\n\n-----Harder trial ' + str(trial + 1) + '-----')
-        ###main()
+        main()
 
     #--- INSANE mode
     num_rows = 20
@@ -159,4 +193,4 @@ if __name__ == '__main__':
 
     for trial in range(5):
         print('\n\n-----INSANE trial ' + str(trial + 1) + '-----')
-        ###main()
+        main()
