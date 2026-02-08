@@ -12,6 +12,7 @@ Sokoban level format:
 """
 
 from queue import PriorityQueue
+from scipy.optimize import linear_sum_assignment
 
 
 class Level:
@@ -166,16 +167,19 @@ class SokobanState:
 
     def heuristic(self):
         """
-        Calculate h-cost using sum of minimum distances from each box to nearest goal.
+        Calculate h-cost using the Hungarian algorithm for optimal box-to-goal assignment.
+
+        Builds a cost matrix of Manhattan distances from each box to each goal,
+        then finds the minimum-cost one-to-one assignment. This is a tighter
+        admissible lower bound than greedy nearest-goal.
         """
-        total = 0
-        for box in self.boxes:
-            min_dist = min(
-                abs(box[0] - goal[0]) + abs(box[1] - goal[1])
-                for goal in self.level.goals
-            )
-            total += min_dist
-        return total
+        goals = list(self.level.goals)
+        cost_matrix = [
+            [abs(box[0] - g[0]) + abs(box[1] - g[1]) for g in goals]
+            for box in self.boxes
+        ]
+        row_ind, col_ind = linear_sum_assignment(cost_matrix)
+        return sum(cost_matrix[r][c] for r, c in zip(row_ind, col_ind))
 
     def generate_successors(self):
         """
