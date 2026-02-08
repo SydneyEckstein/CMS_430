@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sokoban Solver</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 700px;
+            margin: 40px auto;
+            padding: 0 20px;
+            background: #f5f5f5;
+        }
+        h1 { text-align: center; }
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        select, button {
+            padding: 8px 16px;
+            font-size: 14px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        button {
+            cursor: pointer;
+            background: #4a90d9;
+            color: white;
+            border: none;
+        }
+        button:disabled { background: #aaa; cursor: default; }
+        button.reset-btn { background: #e07020; }
+        select { flex: 1; }
+        .board {
+            display: inline-grid;
+            gap: 0;
+            margin: 20px 0;
+            border: 2px solid #333;
+        }
+        .cell {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        .cell-wall    { background: #555; }
+        .cell-floor   { background: #e8dcc8; }
+        .cell-goal    { background: #e8dcc8; color: #c44; font-size: 24px; }
+        .cell-player  { background: #e8dcc8; color: #2266cc; font-weight: bold; }
+        .cell-box     { background: #d4a843; color: #553300; font-weight: bold; }
+        .cell-box-on-goal { background: #6ab04c; color: #224400; font-weight: bold; }
+        .cell-player-on-goal { background: #e8dcc8; color: #2266cc; font-weight: bold; }
+        .step-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .info {
+            font-size: 14px;
+            color: #555;
+            margin-top: 10px;
+        }
+        .loading { color: #888; font-style: italic; }
+        .error { color: #c44; font-weight: bold; }
+        .win { color: #2a9d2a; font-weight: bold; font-size: 18px; }
+        .mode-label {
+            font-size: 13px;
+            color: #777;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Sokoban Solver</h1>
+
+    <div class="controls">
+        <select id="puzzle-select">
+            <option value="">Loading puzzles...</option>
+        </select>
+        <button id="solve-btn" disabled>Solve</button>
+        <button id="reset-btn" class="reset-btn" style="display:none;">Reset</button>
+    </div>
+
+    <div id="mode-label" class="mode-label"></div>
+    <div id="message"></div>
+    <div id="board-container"></div>
+
+    <div id="play-info" class="info" style="display:none;">
+        <span id="move-count"></span>
+    </div>
+
+    <div id="step-section" style="display: none;">
+        <div class="step-controls">
+            <button id="prev-btn">Previous</button>
+            <button id="next-btn">Next</button>
+            <span id="step-label" class="info"></span>
+            <span id="action-label" class="info"></span>
+        </div>
+        <div id="status" class="info"></div>
+    </div>
+
+    <script>
+        // --- Constants ---
+        const CELL_MAP = {
+            '#': { cls: 'cell-wall',           text: '' },
+            ' ': { cls: 'cell-floor',          text: '' },
+            '.': { cls: 'cell-goal',           text: '\u25CB' },
+            '@': { cls: 'cell-player',         text: '\u263A' },
+            '$': { cls: 'cell-box',            text: '\u25A0' },
+            '*': { cls: 'cell-box-on-goal',    text: '\u25A0' },
+            '+': { cls: 'cell-player-on-goal', text: '\u263A' },
+        };
+        const ACTION_NAMES = { 'U': 'Up', 'D': 'Down', 'L': 'Left', 'R': 'Right' };
+        const DIRS = {
+            ArrowUp:    [-1, 0],
+            ArrowDown:  [1, 0],
+            ArrowLeft:  [0, -1],
+            ArrowRight: [0, 1],
+        };
+
+        // --- State ---
+        let mode = 'idle';  // 'idle', 'play', 'solution'
+        let puzzleData = null;  // from /api/puzzle/<id>
+        let player = null;      // [r, c]
+        let boxes = null;       // Set of "r,c" strings
+        let walls = null;       // Set of "r,c" strings
+        let goals = null;       // Set of "r,c" strings
+        let moveCount = 0;
+        let steps = [];
+        let currentStep = 0;
+
+        // --- Helpers ---
+        function posKey(r, c) { return r + ',' + c; }
+
+        function toSet(arr) {
+            const s = new Set();
+            arr.forEach(p => s.add(posKey(p[0], p[1])));
+            return s;
+        }
+
+        function buildBoardString() {
+            let lines = [];
+            for (let r = 0; r < puzzleData.height; r++) {
+                let line = '';
+                for (let c = 0; c < puzzleData.width; c++) {
+                    const k = posKey(r, c);
+                    const isWall = walls.has(k);
+                    const isPlayer = (r === player[0] && c === player[1]);
+                    const isBox = boxes.has(k);
+                    const isGoal = goals.has(k);
+
+                    if (isWall) line += '#';
+                    else if (isPlayer && isGoal) line += '+';
+                    else if (isPlayer) line += '@';
+                    else if (isBox && isGoal) line += '*';
+                    else if (isBox) line += '$';
+                    else if (isGoal) line += '.';
+                    else line += ' ';
+                }
+                lines.push(line);
+            }
+            return lines.join('\n');
+        }
+
+        function checkWin() {
+            for (const g of goals) {
+                if (!boxes.has(g)) return false;
+            }
+            return true;
+        }
+
+        // --- Rendering ---
+        function renderBoard(boardStr) {
+            const container = document.getElementById('board-container');
+            const rows = boardStr.split('\n');
+            const numCols = Math.max(...rows.map(r => r.length));
+
+            const grid = document.createElement('div');
+            grid.className = 'board';
+            grid.style.gridTemplateColumns = `repeat(${numCols}, 40px)`;
+
+            rows.forEach(row => {
+                for (let c = 0; c < numCols; c++) {
+                    const ch = c < row.length ? row[c] : ' ';
+                    const cell = document.createElement('div');
+                    const info = CELL_MAP[ch] || CELL_MAP[' '];
+                    cell.className = 'cell ' + info.cls;
+                    cell.textContent = info.text;
+                    grid.appendChild(cell);
+                }
+            });
+
+            container.innerHTML = '';
+            container.appendChild(grid);
+        }
+
+        function renderPlayState() {
+            renderBoard(buildBoardString());
+            document.getElementById('move-count').textContent = `Moves: ${moveCount}`;
+        }
+
+        // --- Play mode ---
+        async function loadPuzzle(puzzleId) {
+            const resp = await fetch(`/api/puzzle/${puzzleId}`);
+            const data = await resp.json();
+            if (!data.success) return;
+
+            puzzleData = data;
+            player = [data.player[0], data.player[1]];
+            boxes = toSet(data.boxes);
+            walls = toSet(data.walls);
+            goals = toSet(data.goals);
+            moveCount = 0;
+
+            mode = 'play';
+            document.getElementById('step-section').style.display = 'none';
+            document.getElementById('play-info').style.display = 'block';
+            document.getElementById('reset-btn').style.display = '';
+            document.getElementById('mode-label').textContent = 'Use arrow keys to play. Click Solve to see the solution.';
+            document.getElementById('message').textContent = '';
+
+            renderPlayState();
+        }
+
+        function handleMove(dr, dc) {
+            if (mode !== 'play') return;
+
+            const nr = player[0] + dr;
+            const nc = player[1] + dc;
+            const nk = posKey(nr, nc);
+
+            // Can't move into a wall
+            if (walls.has(nk)) return;
+
+            if (boxes.has(nk)) {
+                // Pushing a box
+                const br = nr + dr;
+                const bc = nc + dc;
+                const bk = posKey(br, bc);
+
+                // Box can't be pushed into wall or another box
+                if (walls.has(bk) || boxes.has(bk)) return;
+
+                boxes.delete(nk);
+                boxes.add(bk);
+            }
+
+            player = [nr, nc];
+            moveCount++;
+            renderPlayState();
+
+            if (checkWin()) {
+                mode = 'idle';
+                const msg = document.getElementById('message');
+                msg.className = 'win';
+                msg.textContent = `You solved it in ${moveCount} moves!`;
+                document.getElementById('mode-label').textContent = '';
+            }
+        }
+
+        function resetPuzzle() {
+            if (!puzzleData) return;
+            player = [puzzleData.player[0], puzzleData.player[1]];
+            boxes = toSet(puzzleData.boxes);
+            moveCount = 0;
+            mode = 'play';
+            document.getElementById('message').textContent = '';
+            document.getElementById('message').className = '';
+            document.getElementById('mode-label').textContent = 'Use arrow keys to play. Click Solve to see the solution.';
+            document.getElementById('step-section').style.display = 'none';
+            document.getElementById('play-info').style.display = 'block';
+            renderPlayState();
+        }
+
+        // --- Solution mode ---
+        function showStep(index) {
+            currentStep = index;
+            const step = steps[currentStep];
+            renderBoard(step.board);
+
+            document.getElementById('step-label').textContent =
+                `Step ${step.move} of ${steps[steps.length - 1].move}`;
+            const actionText = step.action ? `Move: ${ACTION_NAMES[step.action]}` : 'Initial state';
+            document.getElementById('action-label').textContent = actionText;
+
+            document.getElementById('prev-btn').disabled = currentStep === 0;
+            document.getElementById('next-btn').disabled = currentStep === steps.length - 1;
+        }
+
+        async function solvePuzzle() {
+            const puzzleId = document.getElementById('puzzle-select').value;
+            if (!puzzleId) return;
+
+            const msg = document.getElementById('message');
+            msg.className = 'loading';
+            msg.textContent = 'Solving...';
+            document.getElementById('play-info').style.display = 'none';
+            document.getElementById('step-section').style.display = 'none';
+            document.getElementById('board-container').innerHTML = '';
+            document.getElementById('solve-btn').disabled = true;
+
+            const resp = await fetch('/api/solve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ puzzle_id: puzzleId })
+            });
+            const data = await resp.json();
+
+            document.getElementById('solve-btn').disabled = false;
+
+            if (!data.success) {
+                msg.className = 'error';
+                msg.textContent = data.error;
+                return;
+            }
+
+            mode = 'solution';
+            msg.textContent = '';
+            msg.className = '';
+            steps = data.steps;
+            document.getElementById('mode-label').textContent = 'Viewing solution. Use Previous/Next or Reset to play again.';
+            document.getElementById('step-section').style.display = 'block';
+            document.getElementById('status').textContent =
+                `Solution: ${data.solution_length} moves | States explored: ${data.states_explored}`;
+            showStep(0);
+        }
+
+        // --- Events ---
+        document.getElementById('solve-btn').addEventListener('click', solvePuzzle);
+        document.getElementById('reset-btn').addEventListener('click', resetPuzzle);
+        document.getElementById('prev-btn').addEventListener('click', () => {
+            if (currentStep > 0) showStep(currentStep - 1);
+        });
+        document.getElementById('next-btn').addEventListener('click', () => {
+            if (currentStep < steps.length - 1) showStep(currentStep + 1);
+        });
+
+        document.getElementById('puzzle-select').addEventListener('change', (e) => {
+            if (e.target.value) loadPuzzle(e.target.value);
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (DIRS[e.key]) {
+                e.preventDefault();
+                const [dr, dc] = DIRS[e.key];
+                handleMove(dr, dc);
+            }
+        });
+
+        // --- Init ---
+        async function loadPuzzles() {
+            const resp = await fetch('/api/puzzles');
+            const data = await resp.json();
+            const select = document.getElementById('puzzle-select');
+            select.innerHTML = '<option value="">-- Select a puzzle --</option>';
+            data.puzzles.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.name;
+                select.appendChild(opt);
+            });
+            document.getElementById('solve-btn').disabled = false;
+        }
+
+        loadPuzzles();
+    </script>
+</body>
+</html>

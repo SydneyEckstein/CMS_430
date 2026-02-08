@@ -309,7 +309,8 @@ def solve(level, max_states=100000):
             'success': True,
             'solution': [],
             'states_explored': 1,
-            'solution_length': 0
+            'solution_length': 0,
+            'goal_state': initial_state
         }
 
     # Priority queue: (f-cost, counter, state)
@@ -336,7 +337,8 @@ def solve(level, max_states=100000):
                 'success': True,
                 'solution': current_state.get_solution_path(),
                 'states_explored': states_explored,
-                'solution_length': current_state.moves
+                'solution_length': current_state.moves,
+                'goal_state': current_state
             }
 
         # Generate and process successors
