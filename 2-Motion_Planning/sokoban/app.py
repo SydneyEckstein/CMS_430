@@ -100,6 +100,27 @@ def solve_puzzle():
         return jsonify({"success": False, "error": f"Unknown puzzle ID: {puzzle_id}"}), 400
 
     level = Level.from_string(PUZZLES[puzzle_id]["data"])
+    return _solve_and_respond(level)
+
+
+@app.route("/api/solve-custom", methods=["POST"])
+def solve_custom_puzzle():
+    data = request.get_json()
+    board = data.get("board", "")
+
+    if not board.strip():
+        return jsonify({"success": False, "error": "Empty board"}), 400
+
+    try:
+        level = Level.from_string(board)
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+    return _solve_and_respond(level)
+
+
+def _solve_and_respond(level):
+    """Run the solver on a level and return the JSON response."""
     result = solve(level)
 
     if not result["success"]:

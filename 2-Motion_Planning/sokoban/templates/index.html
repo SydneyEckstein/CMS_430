@@ -33,6 +33,8 @@
         }
         button:disabled { background: #aaa; cursor: default; }
         button.reset-btn { background: #e07020; }
+        button.design-btn { background: #7b2d8e; }
+        button.back-btn { background: #888; }
         select { flex: 1; }
         .board {
             display: inline-grid;
@@ -55,6 +57,8 @@
         .cell-box     { background: #d4a843; color: #553300; font-weight: bold; }
         .cell-box-on-goal { background: #6ab04c; color: #224400; font-weight: bold; }
         .cell-player-on-goal { background: #e8dcc8; color: #2266cc; font-weight: bold; }
+        .cell.editor-cell { cursor: pointer; }
+        .cell.editor-cell:hover { outline: 2px solid #4a90d9; outline-offset: -2px; }
         .step-controls {
             display: flex;
             gap: 10px;
@@ -74,17 +78,99 @@
             color: #777;
             margin-bottom: 5px;
         }
+
+        /* Editor styles */
+        .editor-controls {
+            margin-bottom: 15px;
+        }
+        .grid-size-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .grid-size-row label { font-size: 14px; }
+        .grid-size-row input[type="number"] {
+            width: 60px;
+            padding: 6px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .tool-palette {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        .tool-btn {
+            padding: 8px 14px;
+            font-size: 13px;
+            border: 2px solid #ccc;
+            border-radius: 4px;
+            background: #fff;
+            color: #333;
+            cursor: pointer;
+        }
+        .tool-btn:hover { border-color: #4a90d9; }
+        .tool-btn.active {
+            border-color: #4a90d9;
+            background: #4a90d9;
+            color: white;
+        }
+        .editor-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .editor-actions button.play-btn { background: #2a9d2a; }
+        .editor-actions button.solve-btn { background: #4a90d9; }
+        .editor-actions button.clear-btn { background: #e07020; }
+        .editor-summary {
+            font-size: 13px;
+            color: #555;
+            margin-top: 8px;
+        }
     </style>
 </head>
 <body>
     <h1>Sokoban Solver</h1>
 
-    <div class="controls">
+    <!-- Preset puzzle controls -->
+    <div id="preset-controls" class="controls">
         <select id="puzzle-select">
             <option value="">Loading puzzles...</option>
         </select>
         <button id="solve-btn" disabled>Solve</button>
         <button id="reset-btn" class="reset-btn" style="display:none;">Reset</button>
+        <button id="design-btn" class="design-btn">Design Puzzle</button>
+    </div>
+
+    <!-- Editor controls (hidden by default) -->
+    <div id="editor-controls" class="editor-controls" style="display:none;">
+        <div class="controls">
+            <button id="back-btn" class="back-btn">Back to Puzzles</button>
+        </div>
+        <div class="grid-size-row">
+            <label>Width:</label>
+            <input type="number" id="grid-width" min="4" max="15" value="7">
+            <label>Height:</label>
+            <input type="number" id="grid-height" min="4" max="15" value="7">
+            <button id="create-grid-btn">Create Grid</button>
+        </div>
+        <div class="tool-palette">
+            <button class="tool-btn active" data-tool="wall"># Wall</button>
+            <button class="tool-btn" data-tool="box">$ Box</button>
+            <button class="tool-btn" data-tool="goal">. Goal</button>
+            <button class="tool-btn" data-tool="player">@ Player</button>
+            <button class="tool-btn" data-tool="eraser">Eraser</button>
+        </div>
+        <div id="editor-summary" class="editor-summary"></div>
+        <div class="editor-actions">
+            <button id="editor-play-btn" class="play-btn">Play</button>
+            <button id="editor-solve-btn" class="solve-btn">Solve</button>
+            <button id="clear-interior-btn" class="clear-btn">Clear Interior</button>
+        </div>
     </div>
 
     <div id="mode-label" class="mode-label"></div>
@@ -125,7 +211,7 @@
         };
 
         // --- State ---
-        let mode = 'idle';  // 'idle', 'play', 'solution'
+        let mode = 'idle';  // 'idle', 'play', 'solution', 'editor'
         let puzzleData = null;  // from /api/puzzle/<id>
         let player = null;      // [r, c]
         let boxes = null;       // Set of "r,c" strings
@@ -134,6 +220,12 @@
         let moveCount = 0;
         let steps = [];
         let currentStep = 0;
+
+        // Editor state
+        let editorWidth = 7;
+        let editorHeight = 7;
+        let activeTool = 'wall';
+        let isCustomPuzzle = false;  // tracks whether current play/solve came from editor
 
         // --- Helpers ---
         function posKey(r, c) { return r + ',' + c; }
@@ -145,13 +237,15 @@
         }
 
         function buildBoardString() {
+            const h = puzzleData ? puzzleData.height : editorHeight;
+            const w = puzzleData ? puzzleData.width : editorWidth;
             let lines = [];
-            for (let r = 0; r < puzzleData.height; r++) {
+            for (let r = 0; r < h; r++) {
                 let line = '';
-                for (let c = 0; c < puzzleData.width; c++) {
+                for (let c = 0; c < w; c++) {
                     const k = posKey(r, c);
                     const isWall = walls.has(k);
-                    const isPlayer = (r === player[0] && c === player[1]);
+                    const isPlayer = player && (r === player[0] && c === player[1]);
                     const isBox = boxes.has(k);
                     const isGoal = goals.has(k);
 
@@ -176,7 +270,7 @@
         }
 
         // --- Rendering ---
-        function renderBoard(boardStr) {
+        function renderBoard(boardStr, clickable) {
             const container = document.getElementById('board-container');
             const rows = boardStr.split('\n');
             const numCols = Math.max(...rows.map(r => r.length));
@@ -185,13 +279,21 @@
             grid.className = 'board';
             grid.style.gridTemplateColumns = `repeat(${numCols}, 40px)`;
 
-            rows.forEach(row => {
+            rows.forEach((row, r) => {
                 for (let c = 0; c < numCols; c++) {
                     const ch = c < row.length ? row[c] : ' ';
                     const cell = document.createElement('div');
                     const info = CELL_MAP[ch] || CELL_MAP[' '];
                     cell.className = 'cell ' + info.cls;
                     cell.textContent = info.text;
+
+                    if (clickable) {
+                        cell.classList.add('editor-cell');
+                        cell.dataset.row = r;
+                        cell.dataset.col = c;
+                        cell.addEventListener('click', handleEditorClick);
+                    }
+
                     grid.appendChild(cell);
                 }
             });
@@ -201,8 +303,257 @@
         }
 
         function renderPlayState() {
-            renderBoard(buildBoardString());
+            renderBoard(buildBoardString(), false);
             document.getElementById('move-count').textContent = `Moves: ${moveCount}`;
+        }
+
+        function renderEditorState() {
+            renderBoard(buildBoardString(), true);
+            updateEditorSummary();
+        }
+
+        function updateEditorSummary() {
+            const boxCount = boxes.size;
+            const goalCount = goals.size;
+            const hasPlayer = player !== null;
+            const summary = document.getElementById('editor-summary');
+            summary.textContent =
+                `Player: ${hasPlayer ? 'placed' : 'not placed'} | ` +
+                `Boxes: ${boxCount} | Goals: ${goalCount}`;
+        }
+
+        // --- Editor mode ---
+        function enterEditorMode() {
+            mode = 'editor';
+            isCustomPuzzle = false;
+            document.getElementById('preset-controls').style.display = 'none';
+            document.getElementById('editor-controls').style.display = '';
+            document.getElementById('step-section').style.display = 'none';
+            document.getElementById('play-info').style.display = 'none';
+            document.getElementById('mode-label').textContent = 'Design your puzzle. Select a tool and click cells to place elements.';
+            document.getElementById('message').textContent = '';
+            document.getElementById('message').className = '';
+            document.getElementById('board-container').innerHTML = '';
+
+            // Reset editor summary
+            updateEditorSummary();
+        }
+
+        function exitEditorMode() {
+            mode = 'idle';
+            isCustomPuzzle = false;
+            document.getElementById('preset-controls').style.display = '';
+            document.getElementById('editor-controls').style.display = 'none';
+            document.getElementById('step-section').style.display = 'none';
+            document.getElementById('play-info').style.display = 'none';
+            document.getElementById('mode-label').textContent = '';
+            document.getElementById('message').textContent = '';
+            document.getElementById('message').className = '';
+            document.getElementById('board-container').innerHTML = '';
+
+            // Reset puzzle selector
+            document.getElementById('puzzle-select').value = '';
+            puzzleData = null;
+        }
+
+        function createGrid() {
+            editorWidth = parseInt(document.getElementById('grid-width').value) || 7;
+            editorHeight = parseInt(document.getElementById('grid-height').value) || 7;
+            editorWidth = Math.max(4, Math.min(15, editorWidth));
+            editorHeight = Math.max(4, Math.min(15, editorHeight));
+
+            // Reset state
+            walls = new Set();
+            boxes = new Set();
+            goals = new Set();
+            player = null;
+            puzzleData = null;
+
+            // Fill perimeter with walls
+            for (let r = 0; r < editorHeight; r++) {
+                for (let c = 0; c < editorWidth; c++) {
+                    if (r === 0 || r === editorHeight - 1 || c === 0 || c === editorWidth - 1) {
+                        walls.add(posKey(r, c));
+                    }
+                }
+            }
+
+            mode = 'editor';
+            document.getElementById('message').textContent = '';
+            document.getElementById('message').className = '';
+            renderEditorState();
+        }
+
+        function clearInterior() {
+            if (mode !== 'editor') return;
+
+            // Keep perimeter walls, clear everything else
+            const perimeterWalls = new Set();
+            for (let r = 0; r < editorHeight; r++) {
+                for (let c = 0; c < editorWidth; c++) {
+                    if (r === 0 || r === editorHeight - 1 || c === 0 || c === editorWidth - 1) {
+                        perimeterWalls.add(posKey(r, c));
+                    }
+                }
+            }
+            walls = perimeterWalls;
+            boxes = new Set();
+            goals = new Set();
+            player = null;
+
+            document.getElementById('message').textContent = '';
+            document.getElementById('message').className = '';
+            renderEditorState();
+        }
+
+        function isPerimeter(r, c) {
+            return r === 0 || r === editorHeight - 1 || c === 0 || c === editorWidth - 1;
+        }
+
+        function handleEditorClick(e) {
+            if (mode !== 'editor') return;
+
+            const r = parseInt(e.currentTarget.dataset.row);
+            const c = parseInt(e.currentTarget.dataset.col);
+
+            // Don't modify perimeter walls
+            if (isPerimeter(r, c)) return;
+
+            const k = posKey(r, c);
+
+            // Remove whatever is currently at this cell
+            walls.delete(k);
+            boxes.delete(k);
+            goals.delete(k);
+            if (player && player[0] === r && player[1] === c) {
+                player = null;
+            }
+
+            // Place the active tool
+            if (activeTool === 'wall') {
+                walls.add(k);
+            } else if (activeTool === 'box') {
+                boxes.add(k);
+            } else if (activeTool === 'goal') {
+                goals.add(k);
+            } else if (activeTool === 'player') {
+                // Remove old player first (only 1 allowed)
+                player = [r, c];
+            }
+            // 'eraser' just removes — already done above
+
+            renderEditorState();
+        }
+
+        function selectTool(tool) {
+            activeTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tool === tool);
+            });
+        }
+
+        function validatePuzzle() {
+            const msg = document.getElementById('message');
+
+            if (!player) {
+                msg.className = 'error';
+                msg.textContent = 'Place a player (@) before playing or solving.';
+                return false;
+            }
+            if (boxes.size === 0) {
+                msg.className = 'error';
+                msg.textContent = 'Place at least one box ($).';
+                return false;
+            }
+            if (boxes.size !== goals.size) {
+                msg.className = 'error';
+                msg.textContent = `Number of boxes (${boxes.size}) must equal number of goals (${goals.size}).`;
+                return false;
+            }
+
+            msg.textContent = '';
+            msg.className = '';
+            return true;
+        }
+
+        function playCustomPuzzle() {
+            if (!validatePuzzle()) return;
+
+            // Store the board as puzzleData so play mode works
+            const boardStr = buildBoardString();
+            puzzleData = {
+                width: editorWidth,
+                height: editorHeight,
+                player: [player[0], player[1]],
+                boxes: Array.from(boxes).map(k => k.split(',').map(Number)),
+                walls: Array.from(walls).map(k => k.split(',').map(Number)),
+                goals: Array.from(goals).map(k => k.split(',').map(Number)),
+            };
+
+            // Switch to play mode
+            isCustomPuzzle = true;
+            mode = 'play';
+            moveCount = 0;
+            document.getElementById('editor-controls').style.display = 'none';
+            document.getElementById('preset-controls').style.display = '';
+            // Hide puzzle selector, show reset only
+            document.getElementById('puzzle-select').style.display = 'none';
+            document.getElementById('solve-btn').style.display = 'none';
+            document.getElementById('design-btn').style.display = 'none';
+            document.getElementById('reset-btn').style.display = '';
+            document.getElementById('step-section').style.display = 'none';
+            document.getElementById('play-info').style.display = 'block';
+            document.getElementById('mode-label').textContent = 'Playing custom puzzle. Use arrow keys to move.';
+            document.getElementById('message').textContent = '';
+
+            renderPlayState();
+        }
+
+        async function solveCustomPuzzle() {
+            if (!validatePuzzle()) return;
+
+            const boardStr = buildBoardString();
+            const msg = document.getElementById('message');
+            msg.className = 'loading';
+            msg.textContent = 'Solving...';
+            document.getElementById('editor-controls').style.display = 'none';
+            document.getElementById('board-container').innerHTML = '';
+
+            const resp = await fetch('/api/solve-custom', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ board: boardStr })
+            });
+            const data = await resp.json();
+
+            if (!data.success) {
+                msg.className = 'error';
+                msg.textContent = data.error;
+                document.getElementById('editor-controls').style.display = '';
+                renderEditorState();
+                return;
+            }
+
+            // Show solution
+            isCustomPuzzle = true;
+            mode = 'solution';
+            msg.textContent = '';
+            msg.className = '';
+            steps = data.steps;
+
+            // Show preset controls area for reset button
+            document.getElementById('preset-controls').style.display = '';
+            document.getElementById('puzzle-select').style.display = 'none';
+            document.getElementById('solve-btn').style.display = 'none';
+            document.getElementById('design-btn').style.display = 'none';
+            document.getElementById('reset-btn').style.display = '';
+
+            document.getElementById('mode-label').textContent = 'Viewing solution. Use Previous/Next or Reset to return to editor.';
+            document.getElementById('step-section').style.display = 'block';
+            document.getElementById('play-info').style.display = 'none';
+            document.getElementById('status').textContent =
+                `Solution: ${data.solution_length} moves | States explored: ${data.states_explored}`;
+            showStep(0);
         }
 
         // --- Play mode ---
@@ -217,6 +568,7 @@
             walls = toSet(data.walls);
             goals = toSet(data.goals);
             moveCount = 0;
+            isCustomPuzzle = false;
 
             mode = 'play';
             document.getElementById('step-section').style.display = 'none';
@@ -265,6 +617,26 @@
         }
 
         function resetPuzzle() {
+            if (isCustomPuzzle) {
+                // Return to editor mode with the saved puzzle data
+                document.getElementById('puzzle-select').style.display = '';
+                document.getElementById('solve-btn').style.display = '';
+                document.getElementById('design-btn').style.display = '';
+                document.getElementById('reset-btn').style.display = 'none';
+                document.getElementById('step-section').style.display = 'none';
+                document.getElementById('play-info').style.display = 'none';
+
+                // Restore editor state from puzzleData
+                player = puzzleData.player ? [puzzleData.player[0], puzzleData.player[1]] : null;
+                boxes = toSet(puzzleData.boxes);
+                walls = toSet(puzzleData.walls);
+                goals = toSet(puzzleData.goals);
+
+                enterEditorMode();
+                renderEditorState();
+                return;
+            }
+
             if (!puzzleData) return;
             player = [puzzleData.player[0], puzzleData.player[1]];
             boxes = toSet(puzzleData.boxes);
@@ -282,7 +654,7 @@
         function showStep(index) {
             currentStep = index;
             const step = steps[currentStep];
-            renderBoard(step.board);
+            renderBoard(step.board, false);
 
             document.getElementById('step-label').textContent =
                 `Step ${step.move} of ${steps[steps.length - 1].move}`;
@@ -321,6 +693,7 @@
             }
 
             mode = 'solution';
+            isCustomPuzzle = false;
             msg.textContent = '';
             msg.className = '';
             steps = data.steps;
@@ -351,6 +724,18 @@
                 const [dr, dc] = DIRS[e.key];
                 handleMove(dr, dc);
             }
+        });
+
+        // Editor events
+        document.getElementById('design-btn').addEventListener('click', enterEditorMode);
+        document.getElementById('back-btn').addEventListener('click', exitEditorMode);
+        document.getElementById('create-grid-btn').addEventListener('click', createGrid);
+        document.getElementById('clear-interior-btn').addEventListener('click', clearInterior);
+        document.getElementById('editor-play-btn').addEventListener('click', playCustomPuzzle);
+        document.getElementById('editor-solve-btn').addEventListener('click', solveCustomPuzzle);
+
+        document.querySelectorAll('.tool-btn').forEach(btn => {
+            btn.addEventListener('click', () => selectTool(btn.dataset.tool));
         });
 
         // --- Init ---
