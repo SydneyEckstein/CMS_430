@@ -166,12 +166,14 @@ def run_experiment(n=100, m_start=1.0, m_end=8.0, m_step=0.25, trials=25):
     return results
 
 
-def plot_results(results, output_file="sat_phase_transition.png"):
+def plot_results(results, n=100, trials=40, output_file="sat_phase_transition.png"):
     """
     Plot the phase transition results.
 
     Parameters:
         results: list of (m, fraction_satisfiable) tuples
+        n: number of variables (for title)
+        trials: number of trials per point (for title)
         output_file: path to save the PNG file
     """
     m_values = [r[0] for r in results]
@@ -182,7 +184,7 @@ def plot_results(results, output_file="sat_phase_transition.png"):
 
     plt.xlabel('Clause-to-Variable Ratio (m)', fontsize=12)
     plt.ylabel('Fraction Satisfiable', fontsize=12)
-    plt.title('3-SAT Phase Transition (n=100 variables, 50 trials per point)', fontsize=14)
+    plt.title(f'3-SAT Phase Transition (n={n} variables, {trials} trials per point)', fontsize=14)
 
     plt.xlim(1.0, 8.0)
     plt.ylim(0.0, 1.05)
@@ -206,6 +208,6 @@ if __name__ == '__main__':
     print("=" * 50)
 
     random.seed(42)
-    results = run_experiment(n=100, m_start=1.0, m_end=8.0, m_step=0.25, trials=50)
+    results = run_experiment(n=100, m_start=1.0, m_end=8.0, m_step=0.25, trials=100)
 
-    plot_results(results, "sat_phase_transition.png")
+    plot_results(results, n=100, trials=100, output_file="sat_phase_transition.png")
