@@ -1,4 +1,5 @@
 import random
+from statistics import median, mean
 
 # ---------------------------------------------------------------------------
 # Phase 1 — Blackjack Simulation Engine
@@ -204,6 +205,80 @@ def chromosome_from_strategy(strategy_fn):
 
 
 # ---------------------------------------------------------------------------
+# Phase 4 — Genetic Algorithm
+# ---------------------------------------------------------------------------
+
+POP_SIZE      = 100
+GENERATIONS   = 100
+N_HANDS       = 1000
+MUTATION_RATE = 0.01
+
+
+def crossover(p1, p2):
+    """Single-point crossover. Returns two children."""
+    point = random.randint(1, CHROM_LEN - 1)
+    return p1[:point] + p2[point:], p2[:point] + p1[point:]
+
+
+def mutate(chromosome, rate=MUTATION_RATE):
+    """Flip each bit independently with probability rate."""
+    return [bit ^ 1 if random.random() < rate else bit for bit in chromosome]
+
+
+def run_ga(pop_size=POP_SIZE, generations=GENERATIONS,
+           n_hands=N_HANDS, mutation_rate=MUTATION_RATE):
+    """
+    Run the genetic algorithm.
+
+    Returns (final_population, history) where history is a list of dicts
+    with keys 'min', 'max', 'median', 'mean' for each generation evaluated.
+    """
+    population = [random_chromosome() for _ in range(pop_size)]
+    history = []
+
+    for gen in range(generations):
+        # Evaluate fitness for every individual
+        fitness_scores = [evaluate_fitness(c, n_hands) for c in population]
+
+        # Record per-generation stats
+        history.append({
+            'min':    min(fitness_scores),
+            'max':    max(fitness_scores),
+            'median': median(fitness_scores),
+            'mean':   mean(fitness_scores),
+        })
+
+        print(
+            f"Gen {gen + 1:3d}/{generations} | "
+            f"min={history[-1]['min']:.4f}  "
+            f"max={history[-1]['max']:.4f}  "
+            f"median={history[-1]['median']:.4f}  "
+            f"mean={history[-1]['mean']:.4f}"
+        )
+
+        # Rank population by fitness (descending)
+        ranked = sorted(zip(fitness_scores, population),
+                        key=lambda x: x[0], reverse=True)
+        weights = [f for f, _ in ranked]
+        chroms  = [c for _, c in ranked]
+
+        # Elitism: top 2 advance unchanged
+        next_gen = [chroms[0], chroms[1]]
+
+        # Fill the rest via roulette wheel selection, crossover, mutation
+        while len(next_gen) < pop_size:
+            p1, p2 = random.choices(chroms, weights=weights, k=2)
+            c1, c2 = crossover(p1, p2)
+            next_gen.append(mutate(c1, mutation_rate))
+            if len(next_gen) < pop_size:
+                next_gen.append(mutate(c2, mutation_rate))
+
+        population = next_gen
+
+    return population, history
+
+
+# ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
 
@@ -236,3 +311,14 @@ if __name__ == '__main__':
     bs_fitness   = evaluate_fitness(bs_chrom,   n_hands=n)
     print(f"  Random chromosome:     {rand_fitness:.4f}")
     print(f"  Basic strategy chrom:  {bs_fitness:.4f}  (should be higher)")
+
+    print(f"\nPhase 4 — GA ({GENERATIONS} generations, pop={POP_SIZE}, hands/eval={N_HANDS}):")
+    final_pop, history = run_ga()
+    best = max(final_pop, key=lambda c: evaluate_fitness(c, n_hands=10_000))
+    best_fitness = evaluate_fitness(best, n_hands=10_000)
+    print(f"\n  Best individual fitness (10k hands): {best_fitness:.4f}")
+    print(f"  Final generation — "
+          f"min={history[-1]['min']:.4f}  "
+          f"max={history[-1]['max']:.4f}  "
+          f"median={history[-1]['median']:.4f}  "
+          f"mean={history[-1]['mean']:.4f}")
