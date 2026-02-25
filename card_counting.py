@@ -17,13 +17,6 @@ _SHOE_SIZE        = len(_DECK) * _SHOE_DECKS      # 312 cards
 _RESHUFFLE_THRESH = int(_SHOE_SIZE * (1 - _PENETRATION))  # 78 cards remaining
 
 
-def fresh_deck():
-    """Return a freshly shuffled 52-card deck."""
-    deck = _DECK[:]
-    random.shuffle(deck)
-    return deck
-
-
 # ---------------------------------------------------------------------------
 # Phase 2 — 6-Deck Shoe with Penetration Tracking
 # ---------------------------------------------------------------------------
@@ -156,8 +149,6 @@ def play_hand(strategy_fn, shoe, running_count, chromosome):
 # ---------------------------------------------------------------------------
 
 _STARTING_BANKROLL = 1_000
-_MIN_BET           = 1
-_MAX_BET           = 8
 _BJ_PAYOUT         = 3 / 2   # blackjack pays 3:2
 
 
