@@ -650,12 +650,10 @@ if __name__ == '__main__':
 
     final_pop, history = run_ga()
 
-    # Identify best individual by re-evaluating with more hands for accuracy
-    print("\nFinding best individual (10k hands each)...")
-    scored = [(evaluate_fitness(c, n_hands=10_000), c) for c in final_pop]
-    best_score, best_chrom = max(scored, key=lambda x: x[0])
-    print(f"Best individual fitness (10k hands): ${best_score}")
-    print(f"Final generation — "
+    # Pick the best individual from the final generation's recorded scores
+    final_scores = [evaluate_fitness(c) for c in final_pop]
+    best_chrom = final_pop[final_scores.index(max(final_scores))]
+    print(f"\nFinal generation — "
           f"min=${history[-1]['min']}  "
           f"max=${history[-1]['max']}  "
           f"median=${history[-1]['median']:.0f}  "
