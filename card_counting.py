@@ -82,26 +82,39 @@ def hand_value(cards):
     return total, aces > 0
 
 
-def play_hand(strategy_fn):
+def play_hand(strategy_fn, shoe, running_count, chromosome):
     """
-    Play one hand of blackjack using the given strategy function.
+    Play one hand of blackjack from a shared shoe.
 
-    strategy_fn(player_total: int, is_soft: bool, dealer_upcard: int) -> bool
-        Returns True to hit, False to stand.
-        dealer_upcard is the raw card value (11 = Ace, 2–10 otherwise).
+    strategy_fn(player_total, is_soft, dealer_upcard) -> bool
+    shoe          : mutable list of cards; cards are popped as dealt
+    running_count : count value carried in from the session
+    chromosome    : 294-bit chromosome used to update the running count
 
-    Returns 'win', 'loss', or 'tie'.
+    Every revealed card updates the running count via update_count().
+
+    Returns (result, running_count) where result is one of:
+        'blackjack' — player natural 21 (pays 3:2)
+        'win'       — player beats dealer
+        'loss'      — player busts or dealer wins
+        'tie'       — equal totals (push)
     """
-    deck = fresh_deck()
-    player = [deck.pop(), deck.pop()]
-    dealer = [deck.pop(), deck.pop()]
-    dealer_upcard = dealer[0]
+    # Deal two cards each, alternating as in a real shoe game
+    p0 = shoe.pop(); running_count = update_count(running_count, p0, chromosome)
+    p1 = shoe.pop(); running_count = update_count(running_count, p1, chromosome)
+    d0 = shoe.pop(); running_count = update_count(running_count, d0, chromosome)
+    d1 = shoe.pop(); running_count = update_count(running_count, d1, chromosome)
+
+    player       = [p0, p1]
+    dealer       = [d0, d1]
+    dealer_upcard = d0
 
     # Check for player blackjack (natural 21 on opening two cards)
     p_total, _ = hand_value(player)
     if p_total == 21:
         d_total, _ = hand_value(dealer)
-        return 'tie' if d_total == 21 else 'win'
+        result = 'tie' if d_total == 21 else 'blackjack'
+        return result, running_count
 
     # Player turn
     while True:
@@ -110,27 +123,89 @@ def play_hand(strategy_fn):
             break
         if not strategy_fn(p_total, is_soft, dealer_upcard):
             break
-        player.append(deck.pop())
+        card = shoe.pop()
+        running_count = update_count(running_count, card, chromosome)
+        player.append(card)
 
     p_total, _ = hand_value(player)
     if p_total > 21:
-        return 'loss'
+        return 'loss', running_count
 
     # Dealer turn: stand on all 17s (S17 rule)
     while True:
         d_total, _ = hand_value(dealer)
         if d_total >= 17:
             break
-        dealer.append(deck.pop())
+        card = shoe.pop()
+        running_count = update_count(running_count, card, chromosome)
+        dealer.append(card)
 
     d_total, _ = hand_value(dealer)
 
     if d_total > 21 or p_total > d_total:
-        return 'win'
+        result = 'win'
     elif p_total < d_total:
-        return 'loss'
+        result = 'loss'
     else:
-        return 'tie'
+        result = 'tie'
+    return result, running_count
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 — Session Simulator
+# ---------------------------------------------------------------------------
+
+_STARTING_BANKROLL = 1_000
+_MIN_BET           = 1
+_MAX_BET           = 8
+_BJ_PAYOUT         = 3 / 2   # blackjack pays 3:2
+
+
+def play_session(chromosome, n_hands=1000):
+    """
+    Simulate a full session of n_hands using the given chromosome.
+
+    Manages the shoe, running count, and bankroll across all hands.
+    The shoe is reshuffled (and the count reset) whenever 75% penetration
+    is reached after a hand completes.
+
+    Blackjacks pay 3:2; ties are a push (no change to bankroll).
+    The session ends early if the bankroll reaches $0.
+
+    Returns (final_bankroll, bankroll_history) where bankroll_history is
+    a list of bankroll values recorded after each hand.
+    """
+    bankroll         = _STARTING_BANKROLL
+    shoe             = fresh_shoe()
+    running_count    = 0
+    strategy_fn      = make_strategy(chromosome)
+    bankroll_history = []
+
+    for _ in range(n_hands):
+        if bankroll <= 0:
+            break
+
+        # Reshuffle if penetration reached
+        if needs_reshuffle(shoe):
+            shoe          = fresh_shoe()
+            running_count = 0
+
+        true_count = calc_true_count(running_count, len(shoe))
+        bet        = size_bet(chromosome, true_count, bankroll)
+
+        result, running_count = play_hand(strategy_fn, shoe, running_count, chromosome)
+
+        if result == 'blackjack':
+            bankroll += int(bet * _BJ_PAYOUT)
+        elif result == 'win':
+            bankroll += bet
+        elif result == 'loss':
+            bankroll -= bet
+        # 'tie' → no change
+
+        bankroll_history.append(bankroll)
+
+    return bankroll, bankroll_history
 
 
 # ---------------------------------------------------------------------------
