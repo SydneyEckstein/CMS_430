@@ -141,14 +141,42 @@ def evaluate_fitness(chromosome, n_hands=1000):
 # ---------------------------------------------------------------------------
 
 # Chromosome layout:
-#   Bits   0–169 : hard hands  — player totals 4–20  (17) × dealer upcards (10)
-#   Bits 170–259 : soft hands  — soft totals 12–20   (9)  × dealer upcards (10)
+#   Bits   0–169 : hard hands       — player totals 4–20  (17) × dealer upcards (10)
+#   Bits 170–259 : soft hands       — soft totals 12–20    (9) × dealer upcards (10)
+#   Bits 260–281 : card count vals  — 11 ranks × 2 bits each
+#   Bits 282–293 : bet multipliers  —  4 ranges × 3 bits each
 #
 # Dealer upcard index: Ace=0, 2=1, 3=2, ..., 10=9
+#
+# Count value encoding (2 bits per rank):
+#   00 → -1 | 01 → 0 | 10 → +1 | 11 → 0 (unused, treat as 0)
+# Rank order: Ace(11), 2, 3, 4, 5, 6, 7, 8, 9, 10, [spare]
+#
+# Bet multiplier encoding (3 bits per range, value b → multiplier b+1):
+#   Range 0 (tc <= -2)  | Range 1 (-1 to +1) | Range 2 (+2 to +4) | Range 3 (>= +5)
 
-CHROM_LEN = 260
-HARD_OFFSET = 0
-SOFT_OFFSET = 170
+CHROM_LEN    = 294
+HARD_OFFSET  = 0
+SOFT_OFFSET  = 170
+COUNT_OFFSET = 260
+BET_OFFSET   = 282
+
+# Rank index for count encoding: Ace(11)→0, 2→1, …, 10→9
+_COUNT_RANK_IDX = {11: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6, 8: 7, 9: 8, 10: 9}
+
+# 2-bit decoding table for count values
+_COUNT_DECODE = {0: -1, 1: 0, 2: 1, 3: 0}
+
+# True count range → bet multiplier slot index
+def _bet_range_idx(true_count):
+    if true_count <= -2:
+        return 0
+    elif true_count <= 1:
+        return 1
+    elif true_count <= 4:
+        return 2
+    else:
+        return 3
 
 
 def _dealer_idx(dealer_upcard):
@@ -166,7 +194,7 @@ def _chrom_index(player_total, is_soft, dealer_upcard):
 
 
 def random_chromosome():
-    """Return a random 260-bit strategy chromosome."""
+    """Return a random 294-bit chromosome (play strategy + count values + bet multipliers)."""
     return [random.randint(0, 1) for _ in range(CHROM_LEN)]
 
 
@@ -205,6 +233,31 @@ def chromosome_from_strategy(strategy_fn):
             chrom[idx] = int(strategy_fn(total, True, dealer_upcard))
 
     return chrom
+
+
+def get_count_value(chromosome, card_value):
+    """
+    Decode the count value for a card rank from Component 2 (bits 260–281).
+
+    card_value : raw card value (11=Ace, 2–10)
+    Returns    : -1, 0, or +1
+    """
+    rank_idx = _COUNT_RANK_IDX.get(card_value, 10)   # unknown ranks → spare slot
+    bit_pos  = COUNT_OFFSET + rank_idx * 2
+    bits     = chromosome[bit_pos] * 2 + chromosome[bit_pos + 1]
+    return _COUNT_DECODE[bits]
+
+
+def get_bet_multiplier(chromosome, true_count):
+    """
+    Decode the bet multiplier for a true count from Component 3 (bits 282–293).
+
+    true_count : integer true count
+    Returns    : multiplier in range 1–8
+    """
+    bit_pos  = BET_OFFSET + _bet_range_idx(true_count) * 3
+    bits     = chromosome[bit_pos] * 4 + chromosome[bit_pos + 1] * 2 + chromosome[bit_pos + 2]
+    return bits + 1   # 0–7 → 1–8
 
 
 # ---------------------------------------------------------------------------
