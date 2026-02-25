@@ -473,7 +473,7 @@ def run_ga(pop_size=POP_SIZE, generations=GENERATIONS,
 
 
 # ---------------------------------------------------------------------------
-# Phase 5 — Output
+# Phase 8 — Output
 # ---------------------------------------------------------------------------
 
 _DEALER_UPCARDS = [11, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -482,6 +482,14 @@ _HARD_TOTALS    = list(range(4, 21))   # 17 rows
 _SOFT_TOTALS    = list(range(12, 21))  # 9 rows
 _SOFT_LABELS    = ['A-A', 'A-2', 'A-3', 'A-4', 'A-5',
                    'A-6', 'A-7', 'A-8', 'A-9']
+
+# Hi-Lo reference count values
+_HILO = {11: -1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 0, 8: 0, 9: 0, 10: -1}
+_RANK_LABELS   = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'A']
+_RANK_CARDVALS = [  2,   3,   4,   5,   6,   7,   8,   9,   10,  11]
+
+_BET_RANGE_LABELS = ['<= -2', '-1 to +1', '+2 to +4', '>= +5']
+_BET_RANGE_TC     = [-3, 0, 3, 6]   # representative true count for each range
 
 
 def _hit_grid(population, totals, is_soft):
@@ -494,8 +502,10 @@ def _hit_grid(population, totals, is_soft):
     ])
 
 
-def plot_fitness(history, save_path='fitness_over_generations.png'):
-    """Figure 1: min/max/median/mean fitness over generations."""
+# --- Output 1: Fitness line plot -------------------------------------------
+
+def plot_fitness(history, save_path='cc_fitness_over_generations.png'):
+    """Figure 1: min/max/median/mean bankroll fitness over generations."""
     gens = list(range(1, len(history) + 1))
 
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -503,20 +513,21 @@ def plot_fitness(history, save_path='fitness_over_generations.png'):
     ax.plot(gens, [h['max']    for h in history], label='Max',    color='firebrick',  linestyle='--')
     ax.plot(gens, [h['median'] for h in history], label='Median', color='darkorange', linewidth=2)
     ax.plot(gens, [h['mean']   for h in history], label='Mean',   color='seagreen',   linewidth=2)
-    ax.axhline(0.480, color='gray', linestyle=':', linewidth=1, label='Basic strategy (~0.480)')
+    ax.axhline(1000, color='gray', linestyle=':', linewidth=1, label='Starting bankroll ($1,000)')
 
     ax.set_xlabel('Generation')
-    ax.set_ylabel('Fitness (Win Rate)')
-    ax.set_title('Blackjack GA — Fitness Over Generations')
+    ax.set_ylabel('Fitness (Final Bankroll $)')
+    ax.set_title('Card Counting GA — Fitness Over Generations')
     ax.legend()
-    ax.set_ylim(0.28, 0.54)
     fig.tight_layout()
     fig.savefig(save_path, dpi=150)
     plt.close(fig)
     print(f"  Saved: {save_path}")
 
 
-def plot_strategy_heatmap(population, save_path='strategy_heatmap.png'):
+# --- Output 2: Strategy heat map -------------------------------------------
+
+def plot_strategy_heatmap(population, save_path='cc_strategy_heatmap.png'):
     """Figure 2: hit-percentage heat map for hard and soft hands."""
     hard_grid = _hit_grid(population, _HARD_TOTALS, is_soft=False)
     soft_grid = _hit_grid(population, _SOFT_TOTALS, is_soft=True)
@@ -541,7 +552,6 @@ def plot_strategy_heatmap(population, save_path='strategy_heatmap.png'):
         ax.set_ylabel('Player Hand',   fontsize=10)
         ax.set_title(title, fontsize=12, fontweight='bold')
 
-        # Annotate each cell with the hit percentage
         for r in range(grid.shape[0]):
             for c in range(grid.shape[1]):
                 pct = int(round(grid[r, c] * 100))
@@ -551,8 +561,80 @@ def plot_strategy_heatmap(population, save_path='strategy_heatmap.png'):
 
     fig.colorbar(im, ax=axes, orientation='vertical', fraction=0.02, pad=0.04,
                  label='% of Population Recommending Hit')
-    fig.suptitle('Blackjack GA — Final Population Strategy\n(Blue = Stand, Red = Hit)',
+    fig.suptitle('Card Counting GA — Final Population Strategy\n(Blue = Stand, Red = Hit)',
                  fontsize=13)
+    fig.savefig(save_path, dpi=150)
+    plt.close(fig)
+    print(f"  Saved: {save_path}")
+
+
+# --- Output 3: Evolved count values vs. Hi-Lo ------------------------------
+
+def print_count_values(best_chromosome):
+    """Print a comparison table of evolved count values vs. the Hi-Lo system."""
+    print("\nEvolved Count Values vs. Hi-Lo System:")
+    print(f"  {'Rank':<6} {'Hi-Lo':>6} {'Evolved':>8}")
+    print("  " + "-" * 22)
+    for label, card_val in zip(_RANK_LABELS, _RANK_CARDVALS):
+        hilo_val    = _HILO[card_val]
+        evolved_val = get_count_value(best_chromosome, card_val)
+        match = "  <-- differs" if evolved_val != hilo_val else ""
+        print(f"  {label:<6} {hilo_val:>+6} {evolved_val:>+8}{match}")
+
+
+def plot_count_values(best_chromosome, save_path='cc_count_values.png'):
+    """Figure 3: bar chart comparing evolved count values to Hi-Lo."""
+    hilo_vals    = [_HILO[v]                          for v in _RANK_CARDVALS]
+    evolved_vals = [get_count_value(best_chromosome, v) for v in _RANK_CARDVALS]
+
+    x = np.arange(len(_RANK_LABELS))
+    width = 0.35
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.bar(x - width / 2, hilo_vals,    width, label='Hi-Lo',   color='steelblue')
+    ax.bar(x + width / 2, evolved_vals, width, label='Evolved',  color='firebrick')
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(_RANK_LABELS)
+    ax.set_yticks([-1, 0, 1])
+    ax.set_xlabel('Card Rank')
+    ax.set_ylabel('Count Value')
+    ax.set_title('Evolved Count Values vs. Hi-Lo System')
+    ax.legend()
+    ax.axhline(0, color='black', linewidth=0.8)
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=150)
+    plt.close(fig)
+    print(f"  Saved: {save_path}")
+
+
+# --- Output 4: Bet multipliers table ---------------------------------------
+
+def print_bet_multipliers(best_chromosome):
+    """Print the evolved bet multipliers for each true count range."""
+    print("\nEvolved Bet Multipliers:")
+    print(f"  {'True Count Range':<18} {'Multiplier':>10}")
+    print("  " + "-" * 30)
+    for label, tc in zip(_BET_RANGE_LABELS, _BET_RANGE_TC):
+        mult = get_bet_multiplier(best_chromosome, tc)
+        print(f"  {label:<18} ${mult:>9}")
+
+
+# --- Output 5: Bankroll trajectory -----------------------------------------
+
+def plot_bankroll_trajectory(best_chromosome, save_path='cc_bankroll_trajectory.png'):
+    """Figure 4: bankroll over a sample 1,000-hand session for the best individual."""
+    _, history = play_session(best_chromosome, n_hands=1000)
+
+    fig, ax = plt.subplots(figsize=(12, 5))
+    ax.plot(range(1, len(history) + 1), history, color='steelblue', linewidth=0.8)
+    ax.axhline(1000, color='gray', linestyle=':', linewidth=1, label='Starting bankroll')
+
+    ax.set_xlabel('Hand Number')
+    ax.set_ylabel('Bankroll ($)')
+    ax.set_title('Card Counting GA — Best Individual Bankroll Trajectory (1,000 Hands)')
+    ax.legend()
+    fig.tight_layout()
     fig.savefig(save_path, dpi=150)
     plt.close(fig)
     print(f"  Saved: {save_path}")
@@ -568,15 +650,23 @@ if __name__ == '__main__':
 
     final_pop, history = run_ga()
 
-    best_fitness = max(evaluate_fitness(c, n_hands=10_000) for c in final_pop)
-    print(f"\nBest individual fitness (10k hands): {best_fitness:.4f}")
+    # Identify best individual by re-evaluating with more hands for accuracy
+    print("\nFinding best individual (10k hands each)...")
+    scored = [(evaluate_fitness(c, n_hands=10_000), c) for c in final_pop]
+    best_score, best_chrom = max(scored, key=lambda x: x[0])
+    print(f"Best individual fitness (10k hands): ${best_score}")
     print(f"Final generation — "
-          f"min={history[-1]['min']:.4f}  "
-          f"max={history[-1]['max']:.4f}  "
-          f"median={history[-1]['median']:.4f}  "
-          f"mean={history[-1]['mean']:.4f}")
+          f"min=${history[-1]['min']}  "
+          f"max=${history[-1]['max']}  "
+          f"median=${history[-1]['median']:.0f}  "
+          f"mean=${history[-1]['mean']:.0f}")
+
+    print_count_values(best_chrom)
+    print_bet_multipliers(best_chrom)
 
     print("\nGenerating figures...")
     plot_fitness(history)
     plot_strategy_heatmap(final_pop)
+    plot_count_values(best_chrom)
+    plot_bankroll_trajectory(best_chrom)
     print("Done.")
