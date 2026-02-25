@@ -68,10 +68,10 @@ def play_hand(strategy_fn):
     if p_total > 21:
         return 'loss'
 
-    # Dealer turn: stand on hard 17+, hit on soft 17 and below
+    # Dealer turn: stand on all 17s (S17 rule)
     while True:
-        d_total, d_soft = hand_value(dealer)
-        if d_total > 17 or (d_total == 17 and not d_soft):
+        d_total, _ = hand_value(dealer)
+        if d_total >= 17:
             break
         dealer.append(deck.pop())
 
