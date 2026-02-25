@@ -40,6 +40,33 @@ def needs_reshuffle(shoe):
     return len(shoe) < _RESHUFFLE_THRESH
 
 
+# ---------------------------------------------------------------------------
+# Phase 3 — Running Count and True Count
+# ---------------------------------------------------------------------------
+
+def update_count(running_count, card, chromosome):
+    """
+    Add the chromosome-encoded count value for a revealed card to the
+    running count and return the updated total.
+
+    running_count : current running count (int)
+    card          : raw card value (11=Ace, 2–10)
+    chromosome    : 294-bit strategy chromosome
+    """
+    return running_count + get_count_value(chromosome, card)
+
+
+def calc_true_count(running_count, remaining_cards):
+    """
+    Normalise the running count by decks remaining and return the
+    rounded integer true count.
+
+    remaining_cards : number of cards left in the shoe
+    """
+    decks_remaining = remaining_cards / 52
+    return round(running_count / decks_remaining)
+
+
 def hand_value(cards):
     """
     Return (total, is_soft).
