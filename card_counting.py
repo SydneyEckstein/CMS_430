@@ -11,12 +11,33 @@ import numpy as np
 # Deck: Ace represented as 11; face cards (J, Q, K) as 10
 _DECK = [2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10, 11] * 4  # 52 cards
 
+_SHOE_DECKS       = 6
+_PENETRATION      = 0.75                          # reshuffle after 75% dealt
+_SHOE_SIZE        = len(_DECK) * _SHOE_DECKS      # 312 cards
+_RESHUFFLE_THRESH = int(_SHOE_SIZE * (1 - _PENETRATION))  # 78 cards remaining
+
 
 def fresh_deck():
     """Return a freshly shuffled 52-card deck."""
     deck = _DECK[:]
     random.shuffle(deck)
     return deck
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — 6-Deck Shoe with Penetration Tracking
+# ---------------------------------------------------------------------------
+
+def fresh_shoe():
+    """Return a freshly shuffled 6-deck shoe (312 cards)."""
+    shoe = _DECK * _SHOE_DECKS
+    random.shuffle(shoe)
+    return shoe
+
+
+def needs_reshuffle(shoe):
+    """Return True when 75% of the shoe has been dealt (< 78 cards remain)."""
+    return len(shoe) < _RESHUFFLE_THRESH
 
 
 def hand_value(cards):
