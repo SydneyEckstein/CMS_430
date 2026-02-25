@@ -1,6 +1,9 @@
 import random
 from statistics import median, mean
 
+import matplotlib.pyplot as plt
+import numpy as np
+
 # ---------------------------------------------------------------------------
 # Phase 1 — Blackjack Simulation Engine
 # ---------------------------------------------------------------------------
@@ -279,46 +282,110 @@ def run_ga(pop_size=POP_SIZE, generations=GENERATIONS,
 
 
 # ---------------------------------------------------------------------------
-# Validation
+# Phase 5 — Output
+# ---------------------------------------------------------------------------
+
+_DEALER_UPCARDS = [11, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+_DEALER_LABELS  = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10']
+_HARD_TOTALS    = list(range(4, 21))   # 17 rows
+_SOFT_TOTALS    = list(range(12, 21))  # 9 rows
+_SOFT_LABELS    = ['A-A', 'A-2', 'A-3', 'A-4', 'A-5',
+                   'A-6', 'A-7', 'A-8', 'A-9']
+
+
+def _hit_grid(population, totals, is_soft):
+    """Return a 2-D array of hit fractions (rows=player totals, cols=dealer upcards)."""
+    n = len(population)
+    return np.array([
+        [sum(get_decision(c, t, is_soft, d) for c in population) / n
+         for d in _DEALER_UPCARDS]
+        for t in totals
+    ])
+
+
+def plot_fitness(history, save_path='fitness_over_generations.png'):
+    """Figure 1: min/max/median/mean fitness over generations."""
+    gens = list(range(1, len(history) + 1))
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(gens, [h['min']    for h in history], label='Min',    color='steelblue',  linestyle='--')
+    ax.plot(gens, [h['max']    for h in history], label='Max',    color='firebrick',  linestyle='--')
+    ax.plot(gens, [h['median'] for h in history], label='Median', color='darkorange', linewidth=2)
+    ax.plot(gens, [h['mean']   for h in history], label='Mean',   color='seagreen',   linewidth=2)
+    ax.axhline(0.480, color='gray', linestyle=':', linewidth=1, label='Basic strategy (~0.480)')
+
+    ax.set_xlabel('Generation')
+    ax.set_ylabel('Fitness (Win Rate)')
+    ax.set_title('Blackjack GA — Fitness Over Generations')
+    ax.legend()
+    ax.set_ylim(0.28, 0.54)
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=150)
+    plt.close(fig)
+    print(f"  Saved: {save_path}")
+
+
+def plot_strategy_heatmap(population, save_path='strategy_heatmap.png'):
+    """Figure 2: hit-percentage heat map for hard and soft hands."""
+    hard_grid = _hit_grid(population, _HARD_TOTALS, is_soft=False)
+    soft_grid = _hit_grid(population, _SOFT_TOTALS, is_soft=True)
+
+    cmap = plt.cm.RdBu_r   # blue = stand (0%), red = hit (100%)
+
+    fig, axes = plt.subplots(1, 2, figsize=(16, 9), layout='constrained')
+
+    panels = [
+        (axes[0], hard_grid, [str(t) for t in _HARD_TOTALS], 'Hard Hands'),
+        (axes[1], soft_grid, _SOFT_LABELS,                    'Soft Hands'),
+    ]
+
+    for ax, grid, row_labels, title in panels:
+        im = ax.imshow(grid, cmap=cmap, vmin=0, vmax=1, aspect='auto')
+
+        ax.set_xticks(range(10))
+        ax.set_xticklabels(_DEALER_LABELS, fontsize=9)
+        ax.set_yticks(range(len(row_labels)))
+        ax.set_yticklabels(row_labels, fontsize=9)
+        ax.set_xlabel('Dealer Upcard', fontsize=10)
+        ax.set_ylabel('Player Hand',   fontsize=10)
+        ax.set_title(title, fontsize=12, fontweight='bold')
+
+        # Annotate each cell with the hit percentage
+        for r in range(grid.shape[0]):
+            for c in range(grid.shape[1]):
+                pct = int(round(grid[r, c] * 100))
+                text_color = 'white' if abs(grid[r, c] - 0.5) > 0.3 else 'black'
+                ax.text(c, r, str(pct), ha='center', va='center',
+                        fontsize=7, color=text_color, fontweight='bold')
+
+    fig.colorbar(im, ax=axes, orientation='vertical', fraction=0.02, pad=0.04,
+                 label='% of Population Recommending Hit')
+    fig.suptitle('Blackjack GA — Final Population Strategy\n(Blue = Stand, Red = Hit)',
+                 fontsize=13)
+    fig.savefig(save_path, dpi=150)
+    plt.close(fig)
+    print(f"  Saved: {save_path}")
+
+
+# ---------------------------------------------------------------------------
+# Main
 # ---------------------------------------------------------------------------
 
 if __name__ == '__main__':
-    bs_chrom = chromosome_from_strategy(basic_strategy)
-    n = 100_000
+    print(f"Running GA: {GENERATIONS} generations, "
+          f"pop={POP_SIZE}, {N_HANDS} hands/eval\n")
 
-    print(f"Phase 1 — basic strategy function over {n:,} hands:")
-    fitness_fn = evaluate_fitness(bs_chrom, n_hands=n)
-    print(f"  Win rate: {fitness_fn:.4f}  (target: ~0.480)\n")
-
-    print("Phase 2 — chromosome spot-checks (basic strategy):")
-    checks = [
-        (8,  False, 10, True,  "hard 8 vs 10 → hit"),
-        (17, False,  6, False, "hard 17 vs 6 → stand"),
-        (12, False,  5, False, "hard 12 vs 5 → stand"),
-        (12, False,  3, True,  "hard 12 vs 3 → hit"),
-        (16, False,  7, True,  "hard 16 vs 7 → hit"),
-        (18, True,   9, True,  "soft 18 vs 9 → hit"),
-        (18, True,   6, False, "soft 18 vs 6 → stand"),
-    ]
-    for total, soft, dealer, expected, label in checks:
-        decision = get_decision(bs_chrom, total, soft, dealer)
-        status = "OK" if decision == expected else "FAIL"
-        print(f"  [{status}] {label}")
-
-    print(f"\nPhase 3 — chromosome fitness evaluation over {n:,} hands:")
-    rand_chrom = random_chromosome()
-    rand_fitness = evaluate_fitness(rand_chrom, n_hands=n)
-    bs_fitness   = evaluate_fitness(bs_chrom,   n_hands=n)
-    print(f"  Random chromosome:     {rand_fitness:.4f}")
-    print(f"  Basic strategy chrom:  {bs_fitness:.4f}  (should be higher)")
-
-    print(f"\nPhase 4 — GA ({GENERATIONS} generations, pop={POP_SIZE}, hands/eval={N_HANDS}):")
     final_pop, history = run_ga()
-    best = max(final_pop, key=lambda c: evaluate_fitness(c, n_hands=10_000))
-    best_fitness = evaluate_fitness(best, n_hands=10_000)
-    print(f"\n  Best individual fitness (10k hands): {best_fitness:.4f}")
-    print(f"  Final generation — "
+
+    best_fitness = max(evaluate_fitness(c, n_hands=10_000) for c in final_pop)
+    print(f"\nBest individual fitness (10k hands): {best_fitness:.4f}")
+    print(f"Final generation — "
           f"min={history[-1]['min']:.4f}  "
           f"max={history[-1]['max']:.4f}  "
           f"median={history[-1]['median']:.4f}  "
           f"mean={history[-1]['mean']:.4f}")
+
+    print("\nGenerating figures...")
+    plot_fitness(history)
+    plot_strategy_heatmap(final_pop)
+    print("Done.")
