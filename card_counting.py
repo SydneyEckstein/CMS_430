@@ -196,7 +196,7 @@ def play_session(chromosome, n_hands=1000):
         result, running_count = play_hand(strategy_fn, shoe, running_count, chromosome)
 
         if result == 'blackjack':
-            bankroll += int(bet * _BJ_PAYOUT)
+            bankroll += round(bet * _BJ_PAYOUT)
         elif result == 'win':
             bankroll += bet
         elif result == 'loss':
