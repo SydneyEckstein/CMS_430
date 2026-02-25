@@ -265,18 +265,11 @@ def basic_strategy(player_total, is_soft, dealer_upcard):
 
 def evaluate_fitness(chromosome, n_hands=1000):
     """
-    Evaluate a strategy chromosome by simulating n_hands of blackjack.
-    Returns fitness = (wins + 0.5 * ties) / n_hands.
+    Evaluate a chromosome by simulating a full n_hands session.
+    Returns the final bankroll (fitness). Returns 0 if the player busts.
     """
-    strategy_fn = make_strategy(chromosome)
-    wins = ties = 0
-    for _ in range(n_hands):
-        result = play_hand(strategy_fn)
-        if result == 'win':
-            wins += 1
-        elif result == 'tie':
-            ties += 1
-    return (wins + 0.5 * ties) / n_hands
+    final_bankroll, _ = play_session(chromosome, n_hands)
+    return final_bankroll
 
 
 # ---------------------------------------------------------------------------
