@@ -82,6 +82,11 @@ def play_hand(strategy_fn):
 
 
 # ---------------------------------------------------------------------------
+# Phase 3 — Fitness Evaluation
+# (evaluate_fitness defined above, alongside the simulation it depends on)
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
 # Validation: hardcoded basic strategy (Wizard of Odds, single-deck, hit/stand)
 # ---------------------------------------------------------------------------
 
@@ -111,8 +116,12 @@ def basic_strategy(player_total, is_soft, dealer_upcard):
         return False                        # hard 17+, always stand
 
 
-def evaluate_fitness(strategy_fn, n_hands=1000):
-    """Simulate n_hands and return fitness score."""
+def evaluate_fitness(chromosome, n_hands=1000):
+    """
+    Evaluate a strategy chromosome by simulating n_hands of blackjack.
+    Returns fitness = (wins + 0.5 * ties) / n_hands.
+    """
+    strategy_fn = make_strategy(chromosome)
     wins = ties = 0
     for _ in range(n_hands):
         result = play_hand(strategy_fn)
@@ -199,17 +208,14 @@ def chromosome_from_strategy(strategy_fn):
 # ---------------------------------------------------------------------------
 
 if __name__ == '__main__':
-    n = 100_000
-    print(f"Phase 1 — basic strategy function over {n:,} hands:")
-    fitness = evaluate_fitness(basic_strategy, n_hands=n)
-    print(f"  Win rate: {fitness:.4f}  (target: ~0.480)\n")
-
-    print(f"Phase 2 — chromosome-encoded basic strategy over {n:,} hands:")
     bs_chrom = chromosome_from_strategy(basic_strategy)
-    fitness_chrom = evaluate_fitness(make_strategy(bs_chrom), n_hands=n)
-    print(f"  Win rate: {fitness_chrom:.4f}  (should match Phase 1)\n")
+    n = 100_000
 
-    print("Chromosome spot-checks (basic strategy):")
+    print(f"Phase 1 — basic strategy function over {n:,} hands:")
+    fitness_fn = evaluate_fitness(bs_chrom, n_hands=n)
+    print(f"  Win rate: {fitness_fn:.4f}  (target: ~0.480)\n")
+
+    print("Phase 2 — chromosome spot-checks (basic strategy):")
     checks = [
         (8,  False, 10, True,  "hard 8 vs 10 → hit"),
         (17, False,  6, False, "hard 17 vs 6 → stand"),
@@ -223,3 +229,10 @@ if __name__ == '__main__':
         decision = get_decision(bs_chrom, total, soft, dealer)
         status = "OK" if decision == expected else "FAIL"
         print(f"  [{status}] {label}")
+
+    print(f"\nPhase 3 — chromosome fitness evaluation over {n:,} hands:")
+    rand_chrom = random_chromosome()
+    rand_fitness = evaluate_fitness(rand_chrom, n_hands=n)
+    bs_fitness   = evaluate_fitness(bs_chrom,   n_hands=n)
+    print(f"  Random chromosome:     {rand_fitness:.4f}")
+    print(f"  Basic strategy chrom:  {bs_fitness:.4f}  (should be higher)")
