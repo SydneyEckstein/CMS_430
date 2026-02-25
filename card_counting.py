@@ -397,7 +397,7 @@ def get_bet_multiplier(chromosome, true_count):
 
 
 # ---------------------------------------------------------------------------
-# Phase 4 — Genetic Algorithm
+# Phase 7 — Genetic Algorithm
 # ---------------------------------------------------------------------------
 
 POP_SIZE      = 100
@@ -424,6 +424,7 @@ def run_ga(pop_size=POP_SIZE, generations=GENERATIONS,
 
     Returns (final_population, history) where history is a list of dicts
     with keys 'min', 'max', 'median', 'mean' for each generation evaluated.
+    Fitness values are final bankroll amounts (dollars).
     """
     population = [random_chromosome() for _ in range(pop_size)]
     history = []
@@ -442,16 +443,17 @@ def run_ga(pop_size=POP_SIZE, generations=GENERATIONS,
 
         print(
             f"Gen {gen + 1:3d}/{generations} | "
-            f"min={history[-1]['min']:.4f}  "
-            f"max={history[-1]['max']:.4f}  "
-            f"median={history[-1]['median']:.4f}  "
-            f"mean={history[-1]['mean']:.4f}"
+            f"min=${history[-1]['min']}  "
+            f"max=${history[-1]['max']}  "
+            f"median=${history[-1]['median']:.0f}  "
+            f"mean=${history[-1]['mean']:.0f}"
         )
 
         # Rank population by fitness (descending)
         ranked = sorted(zip(fitness_scores, population),
                         key=lambda x: x[0], reverse=True)
-        weights = [f for f, _ in ranked]
+        # Floor busted individuals at 1 so they retain a non-zero selection weight
+        weights = [max(f, 1) for f, _ in ranked]
         chroms  = [c for _, c in ranked]
 
         # Elitism: top 2 advance unchanged
