@@ -214,7 +214,7 @@ def chromosome_from_strategy(strategy_fn):
 POP_SIZE      = 100
 GENERATIONS   = 100
 N_HANDS       = 1000
-MUTATION_RATE = 0.01
+MUTATION_RATE = 0.005
 
 
 def crossover(p1, p2):
