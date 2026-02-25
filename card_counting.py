@@ -134,6 +134,26 @@ def play_hand(strategy_fn):
 
 
 # ---------------------------------------------------------------------------
+# Phase 4 — Bet Sizing
+# ---------------------------------------------------------------------------
+
+def size_bet(chromosome, true_count, bankroll):
+    """
+    Determine the bet for the upcoming hand.
+
+    Looks up the bet multiplier for the current true count, computes
+    bet = multiplier × $1, then caps at the player's available bankroll.
+
+    Returns an integer bet in the range [1, min(multiplier, bankroll)],
+    or 0 if the bankroll is already 0.
+    """
+    if bankroll <= 0:
+        return 0
+    multiplier = get_bet_multiplier(chromosome, true_count)
+    return min(multiplier, bankroll)
+
+
+# ---------------------------------------------------------------------------
 # Phase 3 — Fitness Evaluation
 # (evaluate_fitness defined above, alongside the simulation it depends on)
 # ---------------------------------------------------------------------------
