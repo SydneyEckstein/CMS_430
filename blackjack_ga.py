@@ -211,10 +211,10 @@ def chromosome_from_strategy(strategy_fn):
 # Phase 4 — Genetic Algorithm
 # ---------------------------------------------------------------------------
 
-POP_SIZE      = 100
-GENERATIONS   = 100
-N_HANDS       = 1000
-MUTATION_RATE = 0.005
+POP_SIZE      = 150
+GENERATIONS   = 150
+N_HANDS       = 5000
+MUTATION_RATE = 0.01
 
 
 def crossover(p1, p2):
@@ -265,8 +265,8 @@ def run_ga(pop_size=POP_SIZE, generations=GENERATIONS,
         weights = [f for f, _ in ranked]
         chroms  = [c for _, c in ranked]
 
-        # Elitism: top 2 advance unchanged
-        next_gen = [chroms[0], chroms[1]]
+        # Elitism: top 5 advance unchanged
+        next_gen = chroms[:5]
 
         # Fill the rest via roulette wheel selection, crossover, mutation
         while len(next_gen) < pop_size:
