@@ -63,7 +63,7 @@ fitness = (wins + 0.5 × ties) / (wins + losses + ties)
 ## Phased Implementation
 
 **Phase 1 — Blackjack Simulation Engine**
-Build the core game logic independently of the GA. Implement hand evaluation with correct soft/hard ace logic, a full hand loop with dealer behavior (hits on soft 17), and result classification. Validate by hardcoding the basic strategy and confirming ~49.5% win rate over a large sample.
+Build the core game logic independently of the GA. Implement hand evaluation with correct soft/hard ace logic, a full hand loop with dealer behavior (stands on all 17s, S17 rule), and result classification. Validate by hardcoding the basic strategy and confirming ~49.5% win rate over a large sample.
 
 **Phase 2 — Chromosome Encoding**
 Design the 260-bit chromosome with a clean index mapping for both hard and soft hands. Implement a single `get_decision(chromosome, total, is_soft, dealer_upcard)` lookup function. Validate by re-encoding basic strategy and re-running the simulator.
