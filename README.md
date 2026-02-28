@@ -52,7 +52,7 @@ Each bit represents the decision for one player-dealer combination: `0` = Stand,
 
 ### Fitness Function
 
-Fitness is evaluated by simulating **1,000 hands** with the encoded strategy:
+Fitness is evaluated by simulating **5,000 hands** with the encoded strategy:
 
 ```
 fitness = (wins + 0.5 × ties) / (wins + losses + ties)
@@ -69,10 +69,10 @@ Build the core game logic independently of the GA. Implement hand evaluation wit
 Design the 260-bit chromosome with a clean index mapping for both hard and soft hands. Implement a single `get_decision(chromosome, total, is_soft, dealer_upcard)` lookup function. Validate by re-encoding basic strategy and re-running the simulator.
 
 **Phase 3 — Fitness Evaluation**
-Wire the simulation to the chromosome. Simulate 1,000 hands per individual and return the fitness score using the wins/ties/losses formula.
+Wire the simulation to the chromosome. Simulate 5,000 hands per individual and return the fitness score using the wins/ties/losses formula.
 
 **Phase 4 — Genetic Algorithm Loop**
-Initialize 100 random strategy vectors. For each of 100 generations: evaluate fitness, preserve the top 2 elites, fill the remaining 98 slots via roulette wheel selection, single-point crossover, and per-bit mutation at rate 0.01.
+Initialize 150 random strategy vectors. For each of 150 generations: evaluate fitness, preserve the top 5 elites, fill the remaining 145 slots via roulette wheel selection, single-point crossover, and per-bit mutation at rate 0.01.
 
 **Phase 5 — Output and Analysis**
 Generate the two output figures and compare the evolved population's consensus strategy against the Wizard of Odds basic strategy table.
