@@ -34,7 +34,7 @@ print(y)
 
 # Create the Decision TreeClassifier object
 # max_depth=2 restricts the size of the tree to only two splits
-clf = tree.DecisionTreeClassifier(max_depth=2)
+clf = tree.DecisionTreeClassifier(max_depth=10)
 
 
 # Fit the decision tree
