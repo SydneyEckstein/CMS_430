@@ -40,3 +40,7 @@ clf = tree.DecisionTreeClassifier(max_depth=2)
 # Fit the decision tree
 # Our goal is to predict Survival based on Pclass, Age, and Sex
 clf.fit(X, y) 
+
+tree.export_graphviz(clf, out_file='tree.dot', feature_names=['Pclass', 'Age', 'Sex_numeric'],
+                     class_names=['Did not survive', 'Survived'],  filled=True, rounded=True, special_characters=True,
+                     proportion=True)
