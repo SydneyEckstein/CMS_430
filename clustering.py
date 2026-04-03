@@ -115,22 +115,60 @@ plt.savefig('silhouette_plot.png', dpi=150)
 plt.close()
 print("Saved silhouette_plot.png")
 
+# Per-point silhouette plots for k=2 to 10
+from sklearn.metrics import silhouette_samples
+
+fig, axes = plt.subplots(3, 3, figsize=(15, 12))
+axes = axes.flatten()
+
+for idx, k in enumerate(k_values):
+    km = KMeans(n_clusters=k, random_state=42, n_init=10)
+    labels = km.fit_predict(X)
+    sample_scores = silhouette_samples(X, labels)
+    avg_score = silhouette_scores[idx]
+
+    ax = axes[idx]
+    y_lower = 10
+    for cluster in range(k):
+        cluster_scores = np.sort(sample_scores[labels == cluster])
+        size = cluster_scores.shape[0]
+        y_upper = y_lower + size
+        ax.barh(range(y_lower, y_upper), cluster_scores, height=1.0, edgecolor='none')
+        y_lower = y_upper + 10
+
+    ax.axvline(x=avg_score, color='red', linestyle='--', linewidth=1)
+    ax.set_title(f'k={k} (avg={avg_score:.3f})')
+    ax.set_xlabel('Silhouette Score')
+    ax.set_ylabel('Cluster')
+    ax.set_yticks([])
+    ax.set_xlim([-0.2, 1.0])
+
+plt.suptitle('Per-Point Silhouette Plots for k=2 to 10 (Iris Dataset)', fontsize=14)
+plt.tight_layout()
+plt.savefig('silhouette_detail.png', dpi=150)
+plt.close()
+print("Saved silhouette_detail.png")
+
 # --- Phase 6: Hierarchical Clustering Dendrogram ---
 
 linked = linkage(X, method='ward')
 
-plt.figure(figsize=(12, 6))
+# Dynamically set color threshold to highlight exactly 3 clusters:
+# cut between the 3rd-to-last and 2nd-to-last merge distances
+color_threshold = (linked[-3, 2] + linked[-2, 2]) / 2
+
+plt.figure(figsize=(18, 6))
 dendrogram(linked,
-           truncate_mode='lastp',
-           p=30,
-           color_threshold=8.0,
+           color_threshold=color_threshold,
            above_threshold_color='gray',
            leaf_rotation=90,
-           leaf_font_size=8)
+           leaf_font_size=6)
 
-plt.xlabel('Sample Index (or Cluster Size)')
+plt.axhline(y=color_threshold, color='black', linestyle='--', linewidth=0.8, label=f'Cut (3 clusters)')
+plt.xlabel('Sample Index')
 plt.ylabel('Ward Distance')
 plt.title('Hierarchical Clustering Dendrogram — Ward\'s Linkage (Iris Dataset)')
+plt.legend()
 plt.tight_layout()
 plt.savefig('dendrogram.png', dpi=150)
 plt.close()
