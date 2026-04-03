@@ -86,3 +86,31 @@ plt.tight_layout()
 plt.savefig('petal_scatter.png', dpi=150)
 plt.close()
 print("Saved petal_scatter.png")
+
+# --- Phase 5: Silhouette Plot (k=2 to 10) ---
+
+k_values = range(2, 11)
+silhouette_scores = []
+
+for k in k_values:
+    km = KMeans(n_clusters=k, random_state=42, n_init=10)
+    labels = km.fit_predict(X)
+    score = silhouette_score(X, labels)
+    silhouette_scores.append(score)
+    print(f"  k={k}: silhouette score = {score:.4f}")
+
+best_k = k_values[silhouette_scores.index(max(silhouette_scores))]
+print(f"Best k by silhouette score: {best_k}")
+
+plt.figure(figsize=(8, 5))
+plt.plot(list(k_values), silhouette_scores, marker='o', color='steelblue', linewidth=2)
+plt.axvline(x=best_k, color='tomato', linestyle='--', label=f'Best k={best_k}')
+plt.xlabel('Number of Clusters (k)')
+plt.ylabel('Average Silhouette Score')
+plt.title('Silhouette Scores for k=2 to 10 (Iris Dataset)')
+plt.xticks(list(k_values))
+plt.legend()
+plt.tight_layout()
+plt.savefig('silhouette_plot.png', dpi=150)
+plt.close()
+print("Saved silhouette_plot.png")
