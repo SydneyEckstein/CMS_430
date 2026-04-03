@@ -48,10 +48,9 @@
 **Goal:** Identify the optimal number of clusters using silhouette scores.
 
 - Loop k from 2 to 10, fit KMeans, compute `sklearn.metrics.silhouette_score`
-- Plot k (x-axis) vs average silhouette score (y-axis)
-- Identify the peak — expected around k=2, which suggests versicolor/virginica are hard to separate
-- Save as `silhouette_plot.png`
-- Answer: best k by silhouette is likely 2, suggesting the dataset is genuinely difficult to cluster into 3 distinct groups
+- Plot 1 — average silhouette score vs k (line chart): identifies best k at a glance. Save as `silhouette_plot.png`
+- Plot 2 — per-point silhouette plot grid (3x3): shows individual point scores grouped by cluster for every k using `silhouette_samples`. Red dashed line marks the cluster average. Save as `silhouette_detail.png`
+- Best k = 2 (score: 0.681), suggesting versicolor/virginica are not well-separated as distinct clusters
 
 ---
 
@@ -59,8 +58,9 @@
 **Goal:** Build and visualize a Ward's linkage dendrogram.
 
 - Use `scipy.cluster.hierarchy.linkage(data, method='ward')`
-- Plot with `scipy.cluster.hierarchy.dendrogram()`
-- Color threshold to highlight 3 top-level clusters
+- Plot with `scipy.cluster.hierarchy.dendrogram()` — full dendrogram showing all 150 leaves (no truncation)
+- Color threshold computed dynamically as midpoint between 2nd and 3rd top-level merge distances to reliably highlight exactly 3 clusters
+- Dashed horizontal line marks the cut point
 - Save as `dendrogram.png`
 - Observe how the merge sequence reflects setosa separating early, versicolor/virginica merging late
 
@@ -88,6 +88,7 @@ Plots to submit:
 | `kmeans_pca.png` | 3 |
 | `petal_scatter.png` | 4 |
 | `silhouette_plot.png` | 5 |
+| `silhouette_detail.png` | 5 |
 | `dendrogram.png` | 6 |
 | `gmm_scatter.png` | 7 |
 
