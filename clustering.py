@@ -114,3 +114,24 @@ plt.tight_layout()
 plt.savefig('silhouette_plot.png', dpi=150)
 plt.close()
 print("Saved silhouette_plot.png")
+
+# --- Phase 6: Hierarchical Clustering Dendrogram ---
+
+linked = linkage(X, method='ward')
+
+plt.figure(figsize=(12, 6))
+dendrogram(linked,
+           truncate_mode='lastp',
+           p=30,
+           color_threshold=8.0,
+           above_threshold_color='gray',
+           leaf_rotation=90,
+           leaf_font_size=8)
+
+plt.xlabel('Sample Index (or Cluster Size)')
+plt.ylabel('Ward Distance')
+plt.title('Hierarchical Clustering Dendrogram — Ward\'s Linkage (Iris Dataset)')
+plt.tight_layout()
+plt.savefig('dendrogram.png', dpi=150)
+plt.close()
+print("Saved dendrogram.png")
