@@ -68,3 +68,21 @@ plt.tight_layout()
 plt.savefig('kmeans_pca.png', dpi=150)
 plt.close()
 print("Saved kmeans_pca.png")
+
+# --- Phase 4: Petal-Only Scatter Plot ---
+
+# petal length = index 2, petal width = index 3
+plt.figure(figsize=(8, 6))
+for i, species in enumerate(target_names):
+    mask = y == i
+    plt.scatter(X[mask, 2], X[mask, 3],
+                color=colors[i], label=species, edgecolors='k', linewidths=0.4, s=60)
+
+plt.xlabel('Petal Length (cm)')
+plt.ylabel('Petal Width (cm)')
+plt.title('Iris Dataset — Petal Length vs. Petal Width (True Labels)')
+plt.legend()
+plt.tight_layout()
+plt.savefig('petal_scatter.png', dpi=150)
+plt.close()
+print("Saved petal_scatter.png")
