@@ -135,3 +135,48 @@ plt.tight_layout()
 plt.savefig('dendrogram.png', dpi=150)
 plt.close()
 print("Saved dendrogram.png")
+
+# --- Phase 7: Gaussian Mixture Model ---
+
+gmm = GaussianMixture(n_components=3, random_state=42)
+gmm.fit(X)
+gmm_labels = gmm.predict(X)
+
+plt.figure(figsize=(8, 6))
+for i in range(3):
+    mask = gmm_labels == i
+    plt.scatter(X_pca[mask, 0], X_pca[mask, 1],
+                color=colors[i], label=f'GMM Cluster {i}', edgecolors='k', linewidths=0.4, s=60)
+
+plt.xlabel(f'PC1 ({pca.explained_variance_ratio_[0]*100:.1f}% variance)')
+plt.ylabel(f'PC2 ({pca.explained_variance_ratio_[1]*100:.1f}% variance)')
+plt.title('Iris Dataset — Gaussian Mixture Model Clustering (k=3)')
+plt.legend()
+plt.tight_layout()
+plt.savefig('gmm_scatter.png', dpi=150)
+plt.close()
+print("Saved gmm_scatter.png")
+
+# Compare GMM assignments to true labels
+from sklearn.metrics import accuracy_score
+from itertools import permutations
+
+# Find best label mapping (since cluster IDs are arbitrary)
+best_acc = 0
+for perm in permutations([0, 1, 2]):
+    mapped = np.array([perm[l] for l in gmm_labels])
+    acc = accuracy_score(y, mapped)
+    if acc > best_acc:
+        best_acc = acc
+
+print(f"GMM clustering accuracy (best label mapping): {best_acc*100:.1f}%")
+
+# Compare k-means for reference
+best_acc_km = 0
+for perm in permutations([0, 1, 2]):
+    mapped = np.array([perm[l] for l in km_labels])
+    acc = accuracy_score(y, mapped)
+    if acc > best_acc_km:
+        best_acc_km = acc
+
+print(f"K-Means clustering accuracy (best label mapping): {best_acc_km*100:.1f}%")
