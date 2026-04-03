@@ -1,31 +1,38 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from itertools import permutations
 from sklearn.datasets import load_iris
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
+from sklearn.metrics import silhouette_score, silhouette_samples, accuracy_score
 from sklearn.mixture import GaussianMixture
 from scipy.cluster.hierarchy import linkage, dendrogram
 
-# --- Phase 1: Setup & Data Loading ---
+# =============================================================================
+# Phase 1: Setup & Data Loading
+# =============================================================================
 
 iris = load_iris()
-X = iris.data
-y = iris.target
-feature_names = iris.feature_names
+X = iris.data           # shape: (150, 4) — sepal length/width, petal length/width
+y = iris.target         # 0=setosa, 1=versicolor, 2=virginica
 target_names = iris.target_names
 
 print(f"Dataset shape: {X.shape}")
-print(f"Features: {feature_names}")
+print(f"Features: {iris.feature_names}")
 print(f"Classes: {target_names}")
 print(f"Samples per class: {np.bincount(y)}")
 
-# --- Phase 2: PCA Scatter Plot ---
+# Shared color scheme used across all plots
+colors = ['steelblue', 'tomato', 'mediumseagreen']
+
+# =============================================================================
+# Phase 2: PCA Scatter Plot (2 Most Important Dimensions)
+# =============================================================================
+# PCA reduces the 4 features to the 2 directions of greatest variance,
+# letting us visualize the structure of the data in 2D.
 
 pca = PCA(n_components=2)
 X_pca = pca.fit_transform(X)
-
-colors = ['steelblue', 'tomato', 'mediumseagreen']
 
 plt.figure(figsize=(8, 6))
 for i, species in enumerate(target_names):
@@ -42,13 +49,17 @@ plt.savefig('pca_scatter.png', dpi=150)
 plt.close()
 print("Saved pca_scatter.png")
 
-# --- Phase 3: K-Means Clustering (k=3) ---
+# =============================================================================
+# Phase 3: K-Means Clustering (k=3)
+# =============================================================================
+# K-means is fit on the full 4D feature space (not PCA), then cluster
+# assignments and centroids are projected into PCA space for visualization.
+# n_init=10 runs k-means 10 times with different seeds to reduce sensitivity
+# to initialization.
 
 kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
 kmeans.fit(X)
 km_labels = kmeans.labels_
-
-# Project centroids into PCA space
 centroids_pca = pca.transform(kmeans.cluster_centers_)
 
 plt.figure(figsize=(8, 6))
@@ -69,9 +80,13 @@ plt.savefig('kmeans_pca.png', dpi=150)
 plt.close()
 print("Saved kmeans_pca.png")
 
-# --- Phase 4: Petal-Only Scatter Plot ---
+# =============================================================================
+# Phase 4: Petal-Only Scatter Plot
+# =============================================================================
+# Uses raw petal length (index 2) and petal width (index 3) directly.
+# Setosa is cleanly separable from the other two species using petal
+# measurements alone; versicolor and virginica still overlap.
 
-# petal length = index 2, petal width = index 3
 plt.figure(figsize=(8, 6))
 for i, species in enumerate(target_names):
     mask = y == i
@@ -87,7 +102,13 @@ plt.savefig('petal_scatter.png', dpi=150)
 plt.close()
 print("Saved petal_scatter.png")
 
-# --- Phase 5: Silhouette Plot (k=2 to 10) ---
+# =============================================================================
+# Phase 5: Silhouette Analysis (k=2 to 10)
+# =============================================================================
+# Plot 1: Average silhouette score per k — identifies the best k overall.
+# Plot 2: Per-point silhouette grid — shows individual point scores grouped
+#         by cluster, revealing within-cluster cohesion and between-cluster
+#         separation at each k.
 
 k_values = range(2, 11)
 silhouette_scores = []
@@ -102,6 +123,7 @@ for k in k_values:
 best_k = k_values[silhouette_scores.index(max(silhouette_scores))]
 print(f"Best k by silhouette score: {best_k}")
 
+# Plot 1: Average score line chart
 plt.figure(figsize=(8, 5))
 plt.plot(list(k_values), silhouette_scores, marker='o', color='steelblue', linewidth=2)
 plt.axvline(x=best_k, color='tomato', linestyle='--', label=f'Best k={best_k}')
@@ -115,9 +137,7 @@ plt.savefig('silhouette_plot.png', dpi=150)
 plt.close()
 print("Saved silhouette_plot.png")
 
-# Per-point silhouette plots for k=2 to 10
-from sklearn.metrics import silhouette_samples
-
+# Plot 2: Per-point silhouette grid
 fig, axes = plt.subplots(3, 3, figsize=(15, 12))
 axes = axes.flatten()
 
@@ -149,12 +169,15 @@ plt.savefig('silhouette_detail.png', dpi=150)
 plt.close()
 print("Saved silhouette_detail.png")
 
-# --- Phase 6: Hierarchical Clustering Dendrogram ---
+# =============================================================================
+# Phase 6: Hierarchical Clustering Dendrogram (Ward's Linkage)
+# =============================================================================
+# Ward's linkage merges the pair of clusters that minimizes the increase in
+# total within-cluster variance — it tends to produce compact, even clusters.
+# The color threshold is computed dynamically as the midpoint between the
+# 2nd and 3rd top-level merges, reliably coloring exactly 3 clusters.
 
 linked = linkage(X, method='ward')
-
-# Dynamically set color threshold to highlight exactly 3 clusters:
-# cut between the 3rd-to-last and 2nd-to-last merge distances
 color_threshold = (linked[-3, 2] + linked[-2, 2]) / 2
 
 plt.figure(figsize=(18, 6))
@@ -164,17 +187,23 @@ dendrogram(linked,
            leaf_rotation=90,
            leaf_font_size=6)
 
-plt.axhline(y=color_threshold, color='black', linestyle='--', linewidth=0.8, label=f'Cut (3 clusters)')
+plt.axhline(y=color_threshold, color='black', linestyle='--', linewidth=0.8, label='Cut (3 clusters)')
 plt.xlabel('Sample Index')
 plt.ylabel('Ward Distance')
-plt.title('Hierarchical Clustering Dendrogram — Ward\'s Linkage (Iris Dataset)')
+plt.title("Hierarchical Clustering Dendrogram — Ward's Linkage (Iris Dataset)")
 plt.legend()
 plt.tight_layout()
 plt.savefig('dendrogram.png', dpi=150)
 plt.close()
 print("Saved dendrogram.png")
 
-# --- Phase 7: Gaussian Mixture Model ---
+# =============================================================================
+# Phase 7: Gaussian Mixture Model (GMM)
+# =============================================================================
+# GMM assumes data are drawn from overlapping Gaussian distributions and
+# assigns each point to its most probable component. Unlike k-means (which
+# assumes spherical clusters), GMM can model elliptical cluster shapes,
+# giving it more flexibility in the versicolor/virginica overlap region.
 
 gmm = GaussianMixture(n_components=3, random_state=42)
 gmm.fit(X)
@@ -195,21 +224,14 @@ plt.savefig('gmm_scatter.png', dpi=150)
 plt.close()
 print("Saved gmm_scatter.png")
 
-# Compare GMM assignments to true labels
-from sklearn.metrics import accuracy_score
-from itertools import permutations
-
-# Find best label mapping (since cluster IDs are arbitrary)
-best_acc = 0
+# Accuracy comparison — find best label mapping since cluster IDs are arbitrary
+best_acc_gmm = 0
 for perm in permutations([0, 1, 2]):
     mapped = np.array([perm[l] for l in gmm_labels])
     acc = accuracy_score(y, mapped)
-    if acc > best_acc:
-        best_acc = acc
+    if acc > best_acc_gmm:
+        best_acc_gmm = acc
 
-print(f"GMM clustering accuracy (best label mapping): {best_acc*100:.1f}%")
-
-# Compare k-means for reference
 best_acc_km = 0
 for perm in permutations([0, 1, 2]):
     mapped = np.array([perm[l] for l in km_labels])
@@ -217,4 +239,5 @@ for perm in permutations([0, 1, 2]):
     if acc > best_acc_km:
         best_acc_km = acc
 
+print(f"GMM clustering accuracy (best label mapping): {best_acc_gmm*100:.1f}%")
 print(f"K-Means clustering accuracy (best label mapping): {best_acc_km*100:.1f}%")
