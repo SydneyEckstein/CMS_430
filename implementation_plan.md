@@ -68,7 +68,7 @@ Train a neural network with one hidden layer to learn the XOR function.
 ## Script 2: Iris Neural Network (`iris_nn.py`)
 
 ### Goal
-Train a neural network with 3 output nodes to classify iris flowers (3 classes). Also include a ReLU variation for comparison.
+Train a neural network with 3 output nodes to classify iris flowers (3 classes) using sigmoid activation throughout.
 
 ### Network Architecture
 - Input layer: 4 nodes (sepal length, sepal width, petal length, petal width)
@@ -130,20 +130,65 @@ Train a neural network with 3 output nodes to classify iris flowers (3 classes).
 - Store per-epoch error, plot at end using matplotlib
 - Show error decreasing over time
 
-#### Step 8: ReLU Variation
+#### Step 8: Final output
+- Print test set accuracy
+- Display training error plot
+
+---
+
+## Script 3: Iris Neural Network with ReLU (`iris_relu_nn.py`)
+
+### Goal
+A variation of Script 2 that replaces the hidden layer sigmoid activation with ReLU, keeping sigmoid at the output layer. Compare training error curves between the two approaches.
+
+### Network Architecture
+- Same as Script 2: 4 inputs → h hidden nodes → 3 outputs
+- Hidden layer activation: ReLU (instead of sigmoid)
+- Output layer activation: sigmoid (unchanged)
+
+### Weight Representation
+- Same as Script 2
+
+### Step-by-Step Implementation
+
+#### Step 1: Data Loading and Preprocessing
+- Same as Script 2 — use the same train/test split for a fair comparison
+
+#### Step 2: Initialization
+- Same as Script 2
+
+#### Step 3: Activation functions
+- Reuse `sigmoid(x)` and `sigmoid_derivative(x)` for the output layer
 - Define `relu(x)` = `max(0, x)`
 - Define `relu_derivative(x)` = `1 if x > 0 else 0`
-- Copy sigmoid iris network, replace hidden layer activation with ReLU
-- Keep sigmoid at output layer
-- Run same training loop, collect per-epoch error
-- Plot both sigmoid and ReLU error curves on same graph for comparison
-- Add written explanation:
-  - Why ReLU is preferred for modern networks (avoids vanishing gradient)
-  - What leaky ReLU is (`max(0.01x, x)`) and why it helps (nonzero gradient for negative inputs)
+
+#### Step 4: `predict(hidden_weights, output_weights, point)`
+- Same forward pass as Script 2, but apply `relu` at the hidden layer instead of sigmoid
+- Still apply sigmoid at the output layer
+
+#### Step 5: `train(hidden_weights, output_weights, point, target_label, learning_rate)`
+- **Forward pass**: use `relu` for hidden activations, `sigmoid` for outputs (save intermediates)
+- **Backprop — output layer**: identical to Script 2 (sigmoid derivative)
+- **Backprop — hidden layer**:
+  - `error_hidden[i] = sum over k of (output_weights[k][i+1] * delta_output_k)`
+  - `delta_hidden[i] = error_hidden[i] * relu_derivative(hidden_inputs[i])` (use pre-activation input)
+  - Update weights same as Script 2
+- Return updated weights
+
+#### Step 6: `epoch(...)` and `evaluate(...)`
+- Same structure as Script 2
+
+#### Step 7: Track and plot training error
+- Collect per-epoch error same as Script 2
+- Plot ReLU error curve alongside the sigmoid curve from Script 2 for direct comparison
+
+#### Step 8: Written explanation (in comments or docstring)
+- Why ReLU is preferred for modern networks: avoids the vanishing gradient problem — sigmoid saturates near 0/1 making gradients tiny, while ReLU gradient is always 0 or 1
+- What leaky ReLU is: `max(0.01x, x)` — allows a small nonzero gradient for negative inputs, preventing "dead neurons" that stop learning entirely when stuck at 0
 
 #### Step 9: Final output
-- Print test set accuracy for both sigmoid and ReLU models
-- Display combined training error plot
+- Print test set accuracy for this model
+- Display combined training error plot (sigmoid vs ReLU on same axes)
 
 ---
 
@@ -153,5 +198,6 @@ Sprint6/
 ├── implementation_plan.md
 ├── xor_nn.py
 ├── iris_nn.py
+├── iris_relu_nn.py
 └── iris.csv   (copied from previous project)
 ```
