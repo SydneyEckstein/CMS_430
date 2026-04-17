@@ -7,7 +7,6 @@
 Build the foundational building blocks shared by all scripts.
 
 - Implement `sigmoid(x)`: return `1 / (1 + exp(-x))`
-- Implement `sigmoid_derivative(x)`: return `sigmoid(x) * (1 - sigmoid(x))`
 - Implement `predict(hidden_weights, output_weights, point)`:
   - Prepend bias to input
   - Forward pass through hidden layer: dot product + sigmoid for each hidden node
